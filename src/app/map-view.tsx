@@ -35,11 +35,18 @@ type FormState = {
 	expiresAt: string
 }
 
-const INITIAL_FORM_STATE: FormState = {
+const getTodayDateInputValue = () => {
+	const now = new Date()
+	// Normalize to local timezone so HTML date inputs show the correct day
+	const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
+	return local.toISOString().split('T')[0]
+}
+
+const createInitialFormState = (): FormState => ({
 	title: '',
 	description: '',
-	expiresAt: '',
-}
+	expiresAt: getTodayDateInputValue(),
+})
 
 const SUPABASE_TABLE = 'Pins'
 
@@ -421,7 +428,7 @@ export function MapView() {
 	const [newPinLocation, setNewPinLocation] = useState<[number, number] | null>(
 		null,
 	)
-	const [formState, setFormState] = useState<FormState>(INITIAL_FORM_STATE)
+	const [formState, setFormState] = useState<FormState>(createInitialFormState)
 	const [isSubmitting, setIsSubmitting] = useState(false)
 	const [deletingId, setDeletingId] = useState<string | null>(null)
 	const supabaseClient = supabase
@@ -508,7 +515,7 @@ export function MapView() {
 
 	const handleMapClick = useCallback((event: LeafletMouseEvent) => {
 		setNewPinLocation([event.latlng.lat, event.latlng.lng])
-		setFormState(INITIAL_FORM_STATE)
+		setFormState(createInitialFormState())
 	}, [])
 
 	const submitNewPin = useCallback(
@@ -575,7 +582,7 @@ export function MapView() {
 						)
 					}
 					setNewPinLocation(null)
-					setFormState(INITIAL_FORM_STATE)
+					setFormState(createInitialFormState())
 					setError(null)
 				}
 			} catch (insertUnexpectedError) {
@@ -674,7 +681,7 @@ export function MapView() {
 
 	const handleCancelNewPin = useCallback(() => {
 		setNewPinLocation(null)
-		setFormState(INITIAL_FORM_STATE)
+		setFormState(createInitialFormState())
 	}, [])
 
 	const markers = useMemo(
