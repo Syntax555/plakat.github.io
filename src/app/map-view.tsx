@@ -35,6 +35,12 @@ type FormState = {
 	expiresAt: string
 }
 
+const INITIAL_FORM_STATE: FormState = {
+	title: '',
+	description: '',
+	expiresAt: '',
+}
+
 const SUPABASE_TABLE = 'Pins'
 
 const defaultCenter: [number, number] = [48.392578, 10.011085]
@@ -240,7 +246,7 @@ function MapLegend() {
 				</div>
 				<div className={legendItemClass}>
 					<span className={legendDotExpiredClass} />
-					<span>Abgelaufen (Bitte kontrollieren)</span>
+					<span>Abbau überfällig (bitte prüfen)</span>
 				</div>
 			</div>
 		</div>
@@ -344,11 +350,18 @@ type PinPopupContentProps = {
 	pin: Pin
 	onDelete: (pinId: string) => void
 	isDeleting: boolean
+	expired: boolean
 }
 
-function PinPopupContent({ pin, onDelete, isDeleting }: PinPopupContentProps) {
-	const expired = isPinExpired(pin.expiresAt)
-	const expiryLabel = expired ? 'Abgelaufen am' : 'Gültig bis'
+function PinPopupContent({
+	pin,
+	onDelete,
+	isDeleting,
+	expired,
+}: PinPopupContentProps) {
+	const expiryLabel = expired
+		? 'Abbau überfällig seit'
+		: 'Abbau spätestens am'
 	const expiryValueClass = expired ? 'text-red-600 font-semibold' : undefined
 
 	const handleDeleteClick = useCallback(() => {
@@ -394,11 +407,7 @@ export function MapView() {
 	const [newPinLocation, setNewPinLocation] = useState<[number, number] | null>(
 		null,
 	)
-	const [formState, setFormState] = useState<FormState>({
-		title: '',
-		description: '',
-		expiresAt: '',
-	})
+	const [formState, setFormState] = useState<FormState>(INITIAL_FORM_STATE)
 	const [isSubmitting, setIsSubmitting] = useState(false)
 	const [deletingId, setDeletingId] = useState<string | null>(null)
 	const supabaseClient = supabase
@@ -485,7 +494,7 @@ export function MapView() {
 
 	const handleMapClick = useCallback((event: LeafletMouseEvent) => {
 		setNewPinLocation([event.latlng.lat, event.latlng.lng])
-		setFormState({ title: '', description: '', expiresAt: '' })
+		setFormState(INITIAL_FORM_STATE)
 	}, [])
 
 	const submitNewPin = useCallback(
@@ -505,13 +514,13 @@ export function MapView() {
 			const expiresAtValue = formState.expiresAt
 
 			if (!expiresAtValue) {
-				setError('Bitte wähle ein Ablaufdatum.')
+				setError('Bitte wähle einen Abbau-Termin.')
 				return
 			}
 
 			const expiresAtDate = new Date(expiresAtValue)
 			if (Number.isNaN(expiresAtDate.getTime())) {
-				setError('Das Ablaufdatum ist ungültig.')
+				setError('Der Abbau-Termin ist ungültig.')
 				return
 			}
 
@@ -552,7 +561,7 @@ export function MapView() {
 						)
 					}
 					setNewPinLocation(null)
-					setFormState({ title: '', description: '', expiresAt: '' })
+					setFormState(INITIAL_FORM_STATE)
 					setError(null)
 				}
 			} catch (insertUnexpectedError) {
@@ -651,26 +660,32 @@ export function MapView() {
 
 	const handleCancelNewPin = useCallback(() => {
 		setNewPinLocation(null)
-		setFormState({ title: '', description: '', expiresAt: '' })
+		setFormState(INITIAL_FORM_STATE)
 	}, [])
 
 	const markers = useMemo(
 		() =>
-			pins.map(pin => (
-				<Marker
-					key={pin.id}
-					position={[pin.latitude, pin.longitude]}
-					icon={isPinExpired(pin.expiresAt) ? expiredIcon : defaultIcon}
-				>
-					<Popup>
-						<PinPopupContent
-							pin={pin}
-							onDelete={handleDelete}
-							isDeleting={deletingId === pin.id}
-						/>
-					</Popup>
-				</Marker>
-			)),
+			pins.map(pin => {
+				const expired = isPinExpired(pin.expiresAt)
+				const markerIcon = expired ? expiredIcon : defaultIcon
+
+				return (
+					<Marker
+						key={pin.id}
+						position={[pin.latitude, pin.longitude]}
+						icon={markerIcon}
+					>
+						<Popup>
+							<PinPopupContent
+								pin={pin}
+								onDelete={handleDelete}
+								isDeleting={deletingId === pin.id}
+								expired={expired}
+							/>
+						</Popup>
+					</Marker>
+				)
+			}),
 		[deletingId, handleDelete, pins],
 	)
 
@@ -686,8 +701,8 @@ export function MapView() {
 					Titel sowie einer optionalen Beschreibung versehen werden.
 				</p>
 				<p className='mt-1 text-sm text-zinc-600'>
-					Bitte hinterlege auch ein Ablaufdatum, damit abgelaufene Plakate
-					schnell entfernt werden können.
+					Bitte hinterlege auch einen Abbau-Termin, damit fällige Plakate
+					schnell erkannt und entfernt werden können.
 				</p>
 				<MapLegend />
 				{error ? (
@@ -752,7 +767,7 @@ export function MapView() {
 											className='text-sm font-medium text-zinc-900'
 											htmlFor='pin-expires-at'
 										>
-											Ablaufdatum
+											Abbau-Termin
 										</label>
 										<input
 											id='pin-expires-at'
@@ -763,7 +778,7 @@ export function MapView() {
 											className={inputClassName}
 										/>
 										<p className='text-xs text-zinc-500'>
-											Nach diesem Datum wird der Pin rot markiert.
+											Ab diesem Datum markiert die Karte den Pin rot.
 										</p>
 									</div>
 									<div className='flex flex-col gap-2 sm:flex-row sm:justify-end'>
