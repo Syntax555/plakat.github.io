@@ -1,6 +1,13 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+	useCallback,
+	useEffect,
+	useMemo,
+	useState,
+	type ChangeEvent,
+	type FormEvent,
+} from 'react'
 import {
 	MapContainer,
 	Marker,
@@ -51,6 +58,81 @@ const pendingIcon = L.divIcon({
 		<span class="pin-marker__shadow"></span>
 	`,
 })
+
+const deleteButtonClass = [
+	'w-full',
+	'rounded',
+	'bg-red-600',
+	'px-3',
+	'py-2',
+	'text-sm',
+	'font-medium',
+	'text-white',
+	'hover:bg-red-700',
+	'focus-visible:outline',
+	'focus-visible:outline-2',
+	'focus-visible:outline-offset-2',
+	'focus-visible:outline-red-700',
+].join(' ')
+
+const cancelButtonClass = [
+	'rounded',
+	'border',
+	'border-zinc-300',
+	'px-3',
+	'py-2',
+	'text-sm',
+	'font-medium',
+	'text-zinc-700',
+	'hover:bg-zinc-100',
+	'focus-visible:outline',
+	'focus-visible:outline-2',
+	'focus-visible:outline-offset-2',
+	'focus-visible:outline-zinc-400',
+].join(' ')
+
+const submitButtonClass = [
+	'rounded',
+	'bg-blue-600',
+	'px-3',
+	'py-2',
+	'text-sm',
+	'font-semibold',
+	'text-white',
+	'hover:bg-blue-700',
+	'focus-visible:outline',
+	'focus-visible:outline-2',
+	'focus-visible:outline-offset-2',
+	'focus-visible:outline-blue-700',
+].join(' ')
+
+const inputClassName = [
+	'w-full',
+	'rounded',
+	'border',
+	'border-zinc-300',
+	'px-3',
+	'py-2',
+	'text-sm',
+	'focus:border-blue-500',
+	'focus:outline-none',
+	'focus:ring-2',
+	'focus:ring-blue-500/30',
+].join(' ')
+
+const textAreaClassName = [
+	'w-full',
+	'rounded',
+	'border',
+	'border-zinc-300',
+	'px-3',
+	'py-2',
+	'text-sm',
+	'focus:border-blue-500',
+	'focus:outline-none',
+	'focus:ring-2',
+	'focus:ring-blue-500/30',
+].join(' ')
 
 function MapClickHandler({
 	onClick,
@@ -121,16 +203,50 @@ function normalizePins(data: unknown): Pin[] {
 		})
 	}
 
-	return normalized.sort(
-		(a, b) =>
-			new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-	)
+	return sortPins(normalized)
 }
 
 function sortPins(entries: Pin[]): Pin[] {
 	return [...entries].sort(
 		(a, b) =>
 			new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+	)
+}
+
+type PinPopupContentProps = {
+	pin: Pin
+	onDelete: (pinId: string) => void
+	isDeleting: boolean
+}
+
+function PinPopupContent({ pin, onDelete, isDeleting }: PinPopupContentProps) {
+	const handleDeleteClick = useCallback(() => {
+		onDelete(pin.id)
+	}, [onDelete, pin.id])
+
+	return (
+		<div className='space-y-2'>
+			<div>
+				<h3 className='text-base font-semibold text-zinc-900'>{pin.title}</h3>
+				{pin.description ? (
+					<p className='text-sm text-zinc-600 whitespace-pre-wrap'>
+						{pin.description}
+					</p>
+				) : (
+					<p className='text-sm italic text-zinc-500'>
+						Keine Beschreibung hinterlegt.
+					</p>
+				)}
+			</div>
+			<button
+				type='button'
+				onClick={handleDeleteClick}
+				className={deleteButtonClass}
+				disabled={isDeleting}
+			>
+				{isDeleting ? 'Wird geloescht...' : 'Pin loeschen'}
+			</button>
+		</div>
 	)
 }
 
@@ -235,7 +351,7 @@ export function MapView() {
 	}, [])
 
 	const submitNewPin = useCallback(
-		async (event: React.FormEvent<HTMLFormElement>) => {
+		async (event: FormEvent<HTMLFormElement>) => {
 			event.preventDefault()
 			if (!newPinLocation) {
 				return
@@ -306,7 +422,7 @@ export function MapView() {
 	const handleDelete = useCallback(
 		async (pinId: string) => {
 			if (!pinId) {
-				return
+			 return
 			}
 
 			const confirmed = window.confirm(
@@ -348,6 +464,32 @@ export function MapView() {
 		[supabaseClient],
 	)
 
+	const handleTitleChange = useCallback(
+		(event: ChangeEvent<HTMLInputElement>) => {
+			const { value } = event.target
+			setFormState(previous => ({
+				...previous,
+				title: value,
+			}))
+		},
+		[setFormState],
+	)
+
+	const handleDescriptionChange = useCallback(
+		(event: ChangeEvent<HTMLTextAreaElement>) => {
+			const { value } = event.target
+			setFormState(previous => ({
+				...previous,
+				description: value,
+			}))
+		},
+		[setFormState],
+	)
+
+	const handleCancelNewPin = useCallback(() => {
+		setNewPinLocation(null)
+	}, [])
+
 	const markers = useMemo(
 		() =>
 			pins.map(pin => (
@@ -357,32 +499,11 @@ export function MapView() {
 					icon={defaultIcon}
 				>
 					<Popup>
-						<div className='space-y-2'>
-							<div>
-								<h3 className='text-base font-semibold text-zinc-900'>
-									{pin.title}
-								</h3>
-								{pin.description ? (
-									<p className='text-sm text-zinc-600 whitespace-pre-wrap'>
-										{pin.description}
-									</p>
-								) : (
-									<p className='text-sm italic text-zinc-500'>
-										Keine Beschreibung hinterlegt.
-									</p>
-								)}
-							</div>
-							<button
-								type='button'
-								onClick={() => handleDelete(pin.id)}
-								className='w-full rounded bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700'
-								disabled={deletingId === pin.id}
-							>
-								{deletingId === pin.id
-									? 'Wird geloescht...'
-									: 'Pin loeschen'}
-							</button>
-						</div>
+						<PinPopupContent
+							pin={pin}
+							onDelete={handleDelete}
+							isDeleting={deletingId === pin.id}
+						/>
 					</Popup>
 				</Marker>
 			)),
@@ -435,15 +556,10 @@ export function MapView() {
 											id='pin-title'
 											type='text'
 											value={formState.title}
-											onChange={event =>
-												setFormState(previous => ({
-													...previous,
-													title: event.target.value,
-												}))
-											}
+											onChange={handleTitleChange}
 											required
 											placeholder='Zum Beispiel: Plakat Laternenmast'
-											className='w-full rounded border border-zinc-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30'
+											className={inputClassName}
 										/>
 									</div>
 									<div className='space-y-1'>
@@ -456,29 +572,24 @@ export function MapView() {
 										<textarea
 											id='pin-description'
 											value={formState.description}
-											onChange={event =>
-												setFormState(previous => ({
-													...previous,
-													description: event.target.value,
-												}))
-											}
+											onChange={handleDescriptionChange}
 											rows={3}
 											placeholder='Notizen zur Platzierung, z. B. Seite der Strasse oder Besonderheiten'
-											className='w-full rounded border border-zinc-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30'
+											className={textAreaClassName}
 										/>
 									</div>
 									<div className='flex flex-col gap-2 sm:flex-row sm:justify-end'>
 										<button
 											type='button'
-											onClick={() => setNewPinLocation(null)}
-											className='rounded border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-400'
+											onClick={handleCancelNewPin}
+											className={cancelButtonClass}
 											disabled={isSubmitting}
 										>
 											Abbrechen
 										</button>
 										<button
 											type='submit'
-											className='rounded bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700'
+											className={submitButtonClass}
 											disabled={isSubmitting}
 										>
 											{isSubmitting ? 'Speichern...' : 'Pin speichern'}
