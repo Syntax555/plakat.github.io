@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 
+export const dynamic = 'force-static'
+
 const version =
 	process.env.NEXT_PUBLIC_APP_VERSION ??
 	process.env.NEXT_BUILD_ID ??
