@@ -15,10 +15,6 @@ export default function Home() {
 							Plakat-Planung auf einen Blick
 						</h1>
 					</div>
-					<p className='text-sm text-blue-100'>
-						Verwalte eure Plakatstandorte und halte das Team stets auf dem
-						Laufenden.
-					</p>
 				</div>
 			</header>
 			<main className='mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-6 py-8'>
@@ -26,7 +22,7 @@ export default function Home() {
 			</main>
 			<footer className='bg-blue-900/90 px-6 py-4 text-xs text-blue-100'>
 				<div className='mx-auto flex w-full max-w-5xl flex-col gap-1 sm:flex-row sm:items-center sm:justify-between'>
-					<p>&copy; {currentYear} CSU Neu-Ulm.</p>
+					<p>&copy; {currentYear} Tolga Kaan Eskin.</p>
 					<p>Diese Karte basiert auf Daten von OpenStreetMap.</p>
 				</div>
 			</footer>
