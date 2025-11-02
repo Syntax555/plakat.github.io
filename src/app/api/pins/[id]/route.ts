@@ -1,20 +1,29 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { removePin } from "@/lib/pins";
 
+type Params = { id: string };
+
 export async function DELETE(
-  _request: Request,
-  { params }: { params: { id: string } }
+  _request: NextRequest,
+  context: { params: Promise<Params> }
 ) {
   try {
-    const pinId = params.id;
-    if (!pinId) {
-      return NextResponse.json({ message: "Ungültige Pin-ID." }, { status: 400 });
+    const { id } = await context.params;
+
+    if (!id) {
+      return NextResponse.json(
+        { message: "Ungültige Pin-ID." },
+        { status: 400 }
+      );
     }
 
-    const removed = await removePin(pinId);
+    const removed = await removePin(id);
 
     if (!removed) {
-      return NextResponse.json({ message: "Pin wurde nicht gefunden." }, { status: 404 });
+      return NextResponse.json(
+        { message: "Pin wurde nicht gefunden." },
+        { status: 404 }
+      );
     }
 
     return NextResponse.json({ message: "Pin wurde gelöscht." });
