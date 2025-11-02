@@ -1,11 +1,6 @@
 'use client'
 
-import {
-	useCallback,
-	useEffect,
-	useMemo,
-	useState,
-} from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
 	MapContainer,
 	Marker,
@@ -31,7 +26,7 @@ type FormState = {
 	description: string
 }
 
-const STORAGE_KEY = 'plakat:pins'
+const SUPABASE_TABLE = 'Pins'
 
 const defaultCenter: [number, number] = [48.392578, 10.011085]
 
@@ -57,13 +52,6 @@ function MapClickHandler({
 		},
 	})
 	return null
-}
-
-function createPinId(): string {
-	if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-		return crypto.randomUUID()
-	}
-	return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
 }
 
 function normalizePins(data: unknown): Pin[] {
@@ -150,44 +138,12 @@ export function MapView() {
 	const [deletingId, setDeletingId] = useState<string | null>(null)
 	const supabaseClient = supabase
 
-	const persistPins = useCallback(
-		(nextPins: Pin[]) => {
-			if (supabaseClient) {
-				return true
-			}
-			if (typeof window === 'undefined') {
-				return true
-			}
-			try {
-				window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextPins))
-				return true
-			} catch (storageError) {
-				console.error('Failed to persist pins', storageError)
-				return false
-			}
-		},
-		[supabaseClient],
-	)
-
 	useEffect(() => {
 		if (!supabaseClient) {
-			if (typeof window === 'undefined') {
-				setIsLoading(false)
-				return
-			}
-
-			setIsLoading(true)
-			try {
-				const raw = window.localStorage.getItem(STORAGE_KEY)
-				const storedPins = raw ? normalizePins(JSON.parse(raw)) : []
-				setPins(storedPins)
-				setError(null)
-			} catch (loadError) {
-				console.error('Failed to load pins from storage', loadError)
-				setError('Die Pins konnten nicht geladen werden.')
-			} finally {
-				setIsLoading(false)
-			}
+			setError(
+				'Supabase ist nicht konfiguriert. Bitte Umgebungsvariablen pruefen.',
+			)
+			setIsLoading(false)
 			return
 		}
 
@@ -196,7 +152,7 @@ export function MapView() {
 		const loadPins = async () => {
 			setIsLoading(true)
 			const { data, error: loadError } = await supabaseClient
-				.from('pins')
+				.from(SUPABASE_TABLE)
 				.select('*')
 				.order('created_at', { ascending: false })
 
@@ -221,7 +177,7 @@ export function MapView() {
 			.channel('public:pins-stream')
 			.on(
 				'postgres_changes',
-				{ event: '*', schema: 'public', table: 'pins' },
+				{ event: '*', schema: 'public', table: SUPABASE_TABLE },
 				payload => {
 					if (!payload) {
 						return
@@ -284,81 +240,54 @@ export function MapView() {
 
 			setIsSubmitting(true)
 
-			if (supabaseClient) {
-				try {
-					const newPinRecord = {
-						id: createPinId(),
-						title: trimmedTitle,
-						description: trimmedDescription ? trimmedDescription : null,
-						latitude: newPinLocation[0],
-						longitude: newPinLocation[1],
-						created_at: new Date().toISOString(),
-					}
-
-					const { data, error: insertError } = await supabaseClient
-						.from('pins')
-						.insert(newPinRecord)
-						.select()
-						.maybeSingle()
-
-					if (insertError || !data) {
-						console.error('Failed to insert pin via Supabase', insertError)
-						setError('Der Pin konnte nicht gespeichert werden.')
-					} else {
-						const [insertedPin] = normalizePins([data])
-						if (insertedPin) {
-							setPins(previous =>
-								sortPins([
-									insertedPin,
-									...previous.filter(pin => pin.id !== insertedPin.id),
-								]),
-							)
-						}
-						setNewPinLocation(null)
-						setFormState({ title: '', description: '' })
-						setError(null)
-					}
-				} catch (insertUnexpectedError) {
-					console.error('Unexpected Supabase error', insertUnexpectedError)
-					setError('Der Pin konnte nicht gespeichert werden.')
-				} finally {
-					setIsSubmitting(false)
-				}
+			if (!supabaseClient) {
+				setError('Supabase ist nicht konfiguriert.')
+				setIsSubmitting(false)
 				return
 			}
 
-			const newPin: Pin = {
-				id: createPinId(),
-				title: trimmedTitle,
-				description: trimmedDescription ? trimmedDescription : undefined,
-				latitude: newPinLocation[0],
-				longitude: newPinLocation[1],
-				createdAt: new Date().toISOString(),
+			try {
+				const newPinRecord = {
+					title: trimmedTitle,
+					description: trimmedDescription ? trimmedDescription : null,
+					latitude: newPinLocation[0],
+					longitude: newPinLocation[1],
+				}
+
+				const { data, error: insertError } = await supabaseClient
+					.from(SUPABASE_TABLE)
+					.insert(newPinRecord)
+					.select()
+					.maybeSingle()
+
+				if (insertError || !data) {
+					console.error('Failed to insert pin via Supabase', insertError)
+					setError('Der Pin konnte nicht gespeichert werden.')
+				} else {
+					const [insertedPin] = normalizePins([data])
+					if (insertedPin) {
+						setPins(previous =>
+							sortPins([
+								insertedPin,
+								...previous.filter(pin => pin.id !== insertedPin.id),
+							]),
+						)
+					}
+					setNewPinLocation(null)
+					setFormState({ title: '', description: '' })
+					setError(null)
+				}
+			} catch (insertUnexpectedError) {
+				console.error('Unexpected Supabase error', insertUnexpectedError)
+				setError('Der Pin konnte nicht gespeichert werden.')
+			} finally {
+				setIsSubmitting(false)
 			}
-
-			let storedSuccessfully = false
-
-			setPins(previous => {
-				const updated = sortPins([newPin, ...previous])
-				storedSuccessfully = persistPins(updated)
-				return storedSuccessfully ? updated : previous
-			})
-
-			if (storedSuccessfully) {
-				setNewPinLocation(null)
-				setFormState({ title: '', description: '' })
-				setError(null)
-			} else {
-				setError('Die Pins konnten nicht gespeichert werden.')
-			}
-
-			setIsSubmitting(false)
 		},
 		[
 			formState.description,
 			formState.title,
 			newPinLocation,
-			persistPins,
 			supabaseClient,
 		],
 	)
@@ -371,54 +300,33 @@ export function MapView() {
 
 			setDeletingId(pinId)
 
-			if (supabaseClient) {
-				try {
-					const { error: deleteError } = await supabaseClient
-						.from('pins')
-						.delete()
-						.eq('id', pinId)
-
-					if (deleteError) {
-						console.error('Failed to delete pin via Supabase', deleteError)
-						setError('Der Pin konnte nicht geloescht werden.')
-					} else {
-						setPins(previous => previous.filter(pin => pin.id !== pinId))
-						setError(null)
-					}
-				} catch (deleteUnexpectedError) {
-					console.error('Unexpected Supabase delete error', deleteUnexpectedError)
-					setError('Der Pin konnte nicht geloescht werden.')
-				} finally {
-					setDeletingId(null)
-				}
+			if (!supabaseClient) {
+				setError('Supabase ist nicht konfiguriert.')
+				setDeletingId(null)
 				return
 			}
 
-			let removalAttempted = false
-			let removalSucceeded = false
+			try {
+				const { error: deleteError } = await supabaseClient
+					.from(SUPABASE_TABLE)
+					.delete()
+					.eq('id', pinId)
 
-			setPins(previous => {
-				if (!previous.some(pin => pin.id === pinId)) {
-					return previous
+				if (deleteError) {
+					console.error('Failed to delete pin via Supabase', deleteError)
+					setError('Der Pin konnte nicht geloescht werden.')
+				} else {
+					setPins(previous => previous.filter(pin => pin.id !== pinId))
+					setError(null)
 				}
-
-				removalAttempted = true
-				const updated = previous.filter(pin => pin.id !== pinId)
-				removalSucceeded = persistPins(updated)
-				return removalSucceeded ? updated : previous
-			})
-
-			if (!removalAttempted) {
-				setError('Der Pin wurde nicht gefunden.')
-			} else if (removalSucceeded) {
-				setError(null)
-			} else {
+			} catch (deleteUnexpectedError) {
+				console.error('Unexpected Supabase delete error', deleteUnexpectedError)
 				setError('Der Pin konnte nicht geloescht werden.')
+			} finally {
+				setDeletingId(null)
 			}
-
-			setDeletingId(null)
 		},
-		[persistPins, supabaseClient],
+		[supabaseClient],
 	)
 
 	const markers = useMemo(
