@@ -73,6 +73,7 @@ const deleteButtonClass = [
 	'focus-visible:outline-2',
 	'focus-visible:outline-offset-2',
 	'focus-visible:outline-red-700',
+	'cursor-pointer',
 ].join(' ')
 
 const cancelButtonClass = [
@@ -89,6 +90,7 @@ const cancelButtonClass = [
 	'focus-visible:outline-2',
 	'focus-visible:outline-offset-2',
 	'focus-visible:outline-zinc-400',
+	'cursor-pointer',
 ].join(' ')
 
 const submitButtonClass = [
@@ -104,6 +106,7 @@ const submitButtonClass = [
 	'focus-visible:outline-2',
 	'focus-visible:outline-offset-2',
 	'focus-visible:outline-blue-700',
+	'cursor-pointer',
 ].join(' ')
 
 const inputClassName = [
@@ -225,7 +228,7 @@ function PinPopupContent({ pin, onDelete, isDeleting }: PinPopupContentProps) {
 	}, [onDelete, pin.id])
 
 	return (
-		<div className='space-y-2'>
+		<div className='space-y-2 cursor-default'>
 			<div>
 				<h3 className='text-base font-semibold text-zinc-900'>{pin.title}</h3>
 				{pin.description ? (
@@ -512,7 +515,7 @@ export function MapView() {
 
 	return (
 		<div className='flex h-full flex-col gap-4'>
-			<div className='rounded-lg bg-white p-4 shadow-sm'>
+			<div className='rounded-lg bg-white p-4 shadow-sm cursor-default'>
 				<h2 className='text-lg font-semibold text-zinc-900'>
 					Karte der CSU Neu-Ulm
 				</h2>
