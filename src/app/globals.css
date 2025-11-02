@@ -173,3 +173,12 @@
 .pin-marker--pending .pin-marker__pin::after {
   border-top-color: #f97316;
 }
+
+.pin-marker--expired .pin-marker__pin {
+  background: #dc2626;
+  box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.2);
+}
+
+.pin-marker--expired .pin-marker__pin::after {
+  border-top-color: #dc2626;
+}

@@ -26,11 +26,13 @@ type Pin = {
 	latitude: number
 	longitude: number
 	createdAt: string
+	expiresAt: string
 }
 
 type FormState = {
 	title: string
 	description: string
+	expiresAt: string
 }
 
 const SUPABASE_TABLE = 'Pins'
@@ -50,6 +52,17 @@ const defaultIcon = L.divIcon({
 
 const pendingIcon = L.divIcon({
 	className: 'pin-marker pin-marker--pending',
+	iconSize: [30, 42],
+	iconAnchor: [15, 42],
+	popupAnchor: [0, -38],
+	html: `
+		<span class="pin-marker__pin"></span>
+		<span class="pin-marker__shadow"></span>
+	`,
+})
+
+const expiredIcon = L.divIcon({
+	className: 'pin-marker pin-marker--expired',
 	iconSize: [30, 42],
 	iconAnchor: [15, 42],
 	popupAnchor: [0, -38],
@@ -155,6 +168,13 @@ const legendDotDefaultClass = [legendDotBaseClass, 'bg-blue-600'].join(' ')
 
 const legendDotPendingClass = [legendDotBaseClass, 'bg-orange-500'].join(' ')
 
+const legendDotExpiredClass = [legendDotBaseClass, 'bg-red-600'].join(' ')
+
+const tileLayerAttribution = [
+	'&copy; <a href="https://www.openstreetmap.org/copyright">',
+	'OpenStreetMap</a> Mitwirkende',
+].join(' ')
+
 const inputClassName = [
 	'w-full',
 	'rounded',
@@ -183,6 +203,28 @@ const textAreaClassName = [
 	'focus:ring-blue-500/30',
 ].join(' ')
 
+function isPinExpired(expiresAt: string): boolean {
+	const parsed = new Date(expiresAt)
+	if (Number.isNaN(parsed.getTime())) {
+		return false
+	}
+	const endOfDay = new Date(parsed)
+	endOfDay.setHours(23, 59, 59, 999)
+	return endOfDay.getTime() < Date.now()
+}
+
+function formatDateShort(value: string): string {
+	const parsed = new Date(value)
+	if (Number.isNaN(parsed.getTime())) {
+		return value
+	}
+	return parsed.toLocaleDateString('de-DE', {
+		day: '2-digit',
+		month: '2-digit',
+		year: 'numeric',
+	})
+}
+
 function MapLegend() {
 	return (
 		<div className={legendContainerClass}>
@@ -195,6 +237,10 @@ function MapLegend() {
 				<div className={legendItemClass}>
 					<span className={legendDotPendingClass} />
 					<span>Neuer Pin (noch nicht gespeichert)</span>
+				</div>
+				<div className={legendItemClass}>
+					<span className={legendDotExpiredClass} />
+					<span>Abgelaufen (Bitte kontrollieren)</span>
 				</div>
 			</div>
 		</div>
@@ -230,6 +276,8 @@ function normalizePins(data: unknown): Pin[] {
 			latitude?: unknown
 			longitude?: unknown
 			created_at?: unknown
+			expires_at?: unknown
+			expiresAt?: unknown
 		}
 
 		const id = typeof candidate.id === 'string' ? candidate.id : null
@@ -246,13 +294,24 @@ function normalizePins(data: unknown): Pin[] {
 			createdAtRaw && !Number.isNaN(Date.parse(createdAtRaw))
 				? createdAtRaw
 				: null
+		const expiresAtRaw =
+			typeof candidate.expiresAt === 'string'
+				? candidate.expiresAt
+				: typeof candidate.expires_at === 'string'
+					? candidate.expires_at
+					: null
+		const expiresAt =
+			expiresAtRaw && !Number.isNaN(Date.parse(expiresAtRaw))
+				? expiresAtRaw
+				: null
 
 		if (
 			!id ||
 			!title ||
 			!Number.isFinite(latitude) ||
 			!Number.isFinite(longitude) ||
-			!createdAt
+			!createdAt ||
+			!expiresAt
 		) {
 			continue
 		}
@@ -267,6 +326,7 @@ function normalizePins(data: unknown): Pin[] {
 			latitude,
 			longitude,
 			createdAt,
+			expiresAt,
 		})
 	}
 
@@ -287,6 +347,10 @@ type PinPopupContentProps = {
 }
 
 function PinPopupContent({ pin, onDelete, isDeleting }: PinPopupContentProps) {
+	const expired = isPinExpired(pin.expiresAt)
+	const expiryLabel = expired ? 'Abgelaufen am' : 'Gültig bis'
+	const expiryValueClass = expired ? 'text-red-600 font-semibold' : undefined
+
 	const handleDeleteClick = useCallback(() => {
 		onDelete(pin.id)
 	}, [onDelete, pin.id])
@@ -304,6 +368,12 @@ function PinPopupContent({ pin, onDelete, isDeleting }: PinPopupContentProps) {
 						Keine Beschreibung hinterlegt.
 					</p>
 				)}
+				<p className='text-sm text-zinc-600'>
+					<span className='font-medium text-zinc-800'>{expiryLabel}:</span>{' '}
+					<span className={expiryValueClass}>
+						{formatDateShort(pin.expiresAt)}
+					</span>
+				</p>
 			</div>
 			<button
 				type='button'
@@ -327,6 +397,7 @@ export function MapView() {
 	const [formState, setFormState] = useState<FormState>({
 		title: '',
 		description: '',
+		expiresAt: '',
 	})
 	const [isSubmitting, setIsSubmitting] = useState(false)
 	const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -414,7 +485,7 @@ export function MapView() {
 
 	const handleMapClick = useCallback((event: LeafletMouseEvent) => {
 		setNewPinLocation([event.latlng.lat, event.latlng.lng])
-		setFormState({ title: '', description: '' })
+		setFormState({ title: '', description: '', expiresAt: '' })
 	}, [])
 
 	const submitNewPin = useCallback(
@@ -431,6 +502,18 @@ export function MapView() {
 			}
 
 			const trimmedDescription = formState.description.trim()
+			const expiresAtValue = formState.expiresAt
+
+			if (!expiresAtValue) {
+				setError('Bitte wähle ein Ablaufdatum.')
+				return
+			}
+
+			const expiresAtDate = new Date(expiresAtValue)
+			if (Number.isNaN(expiresAtDate.getTime())) {
+				setError('Das Ablaufdatum ist ungültig.')
+				return
+			}
 
 			setIsSubmitting(true)
 
@@ -446,6 +529,7 @@ export function MapView() {
 					description: trimmedDescription ? trimmedDescription : null,
 					latitude: newPinLocation[0],
 					longitude: newPinLocation[1],
+					expires_at: expiresAtValue,
 				}
 
 				const { data, error: insertError } = await supabaseClient
@@ -468,7 +552,7 @@ export function MapView() {
 						)
 					}
 					setNewPinLocation(null)
-					setFormState({ title: '', description: '' })
+					setFormState({ title: '', description: '', expiresAt: '' })
 					setError(null)
 				}
 			} catch (insertUnexpectedError) {
@@ -480,6 +564,7 @@ export function MapView() {
 		},
 		[
 			formState.description,
+			formState.expiresAt,
 			formState.title,
 			newPinLocation,
 			supabaseClient,
@@ -553,8 +638,20 @@ export function MapView() {
 		[setFormState],
 	)
 
+	const handleExpiresAtChange = useCallback(
+		(event: ChangeEvent<HTMLInputElement>) => {
+			const { value } = event.target
+			setFormState(previous => ({
+				...previous,
+				expiresAt: value,
+			}))
+		},
+		[setFormState],
+	)
+
 	const handleCancelNewPin = useCallback(() => {
 		setNewPinLocation(null)
+		setFormState({ title: '', description: '', expiresAt: '' })
 	}, [])
 
 	const markers = useMemo(
@@ -563,7 +660,7 @@ export function MapView() {
 				<Marker
 					key={pin.id}
 					position={[pin.latitude, pin.longitude]}
-					icon={defaultIcon}
+					icon={isPinExpired(pin.expiresAt) ? expiredIcon : defaultIcon}
 				>
 					<Popup>
 						<PinPopupContent
@@ -588,6 +685,10 @@ export function MapView() {
 					Plakat zu setzen. Jeder Pin ist für alle sichtbar und kann mit einem
 					Titel sowie einer optionalen Beschreibung versehen werden.
 				</p>
+				<p className='mt-1 text-sm text-zinc-600'>
+					Bitte hinterlege auch ein Ablaufdatum, damit abgelaufene Plakate
+					schnell entfernt werden können.
+				</p>
 				<MapLegend />
 				{error ? (
 					<p className='mt-2 text-sm text-red-600'>{error}</p>
@@ -604,7 +705,7 @@ export function MapView() {
 					scrollWheelZoom
 				>
 					<TileLayer
-						attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> Mitwirkende'
+						attribution={tileLayerAttribution}
 						url='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
 					/>
 					<MapClickHandler onClick={handleMapClick} />
@@ -645,6 +746,25 @@ export function MapView() {
 											placeholder='Notizen zur Platzierung, z. B. Seite der Straße oder Besonderheiten'
 											className={textAreaClassName}
 										/>
+									</div>
+									<div className='space-y-1'>
+										<label
+											className='text-sm font-medium text-zinc-900'
+											htmlFor='pin-expires-at'
+										>
+											Ablaufdatum
+										</label>
+										<input
+											id='pin-expires-at'
+											type='date'
+											value={formState.expiresAt}
+											onChange={handleExpiresAtChange}
+											required
+											className={inputClassName}
+										/>
+										<p className='text-xs text-zinc-500'>
+											Nach diesem Datum wird der Pin rot markiert.
+										</p>
 									</div>
 									<div className='flex flex-col gap-2 sm:flex-row sm:justify-end'>
 										<button
