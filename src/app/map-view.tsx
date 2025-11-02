@@ -41,6 +41,17 @@ const defaultIcon = L.divIcon({
 	`,
 })
 
+const pendingIcon = L.divIcon({
+	className: 'pin-marker pin-marker--pending',
+	iconSize: [30, 42],
+	iconAnchor: [15, 42],
+	popupAnchor: [0, -38],
+	html: `
+		<span class="pin-marker__pin"></span>
+		<span class="pin-marker__shadow"></span>
+	`,
+})
+
 function MapClickHandler({
 	onClick,
 }: {
@@ -402,7 +413,7 @@ export function MapView() {
 					<MapClickHandler onClick={handleMapClick} />
 					{markers}
 					{newPinLocation ? (
-						<Marker position={newPinLocation} icon={defaultIcon}>
+						<Marker position={newPinLocation} icon={pendingIcon}>
 							<Popup>
 								<form className='space-y-3' onSubmit={submitNewPin}>
 									<div className='space-y-1'>
