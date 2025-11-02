@@ -109,6 +109,52 @@ const submitButtonClass = [
 	'cursor-pointer',
 ].join(' ')
 
+const legendContainerClass = [
+	'mt-3',
+	'flex',
+	'flex-col',
+	'gap-2',
+	'cursor-default',
+	'md:flex-row',
+	'md:items-center',
+	'md:gap-3',
+].join(' ')
+
+const legendLabelClass = [
+	'text-sm',
+	'font-semibold',
+	'text-zinc-800',
+].join(' ')
+
+const legendListClass = [
+	'flex',
+	'flex-col',
+	'gap-2',
+	'md:flex-row',
+	'md:gap-3',
+].join(' ')
+
+const legendItemClass = [
+	'flex',
+	'items-center',
+	'gap-2',
+	'text-sm',
+	'text-zinc-600',
+].join(' ')
+
+const legendDotBaseClass = [
+	'h-3',
+	'w-3',
+	'rounded-full',
+	'border',
+	'border-white',
+	'shadow-sm',
+].join(' ')
+
+const legendDotDefaultClass = [legendDotBaseClass, 'bg-blue-600'].join(' ')
+
+const legendDotPendingClass = [legendDotBaseClass, 'bg-orange-500'].join(' ')
+
 const inputClassName = [
 	'w-full',
 	'rounded',
@@ -136,6 +182,24 @@ const textAreaClassName = [
 	'focus:ring-2',
 	'focus:ring-blue-500/30',
 ].join(' ')
+
+function MapLegend() {
+	return (
+		<div className={legendContainerClass}>
+			<p className={legendLabelClass}>Legende:</p>
+			<div className={legendListClass}>
+				<div className={legendItemClass}>
+					<span className={legendDotDefaultClass} />
+					<span>Bestehender Pin</span>
+				</div>
+				<div className={legendItemClass}>
+					<span className={legendDotPendingClass} />
+					<span>Neuer Pin (noch nicht gespeichert)</span>
+				</div>
+			</div>
+		</div>
+	)
+}
 
 function MapClickHandler({
 	onClick,
@@ -524,6 +588,7 @@ export function MapView() {
 					Plakat zu setzen. Jeder Pin ist für alle sichtbar und kann mit einem
 					Titel sowie einer optionalen Beschreibung versehen werden.
 				</p>
+				<MapLegend />
 				{error ? (
 					<p className='mt-2 text-sm text-red-600'>{error}</p>
 				) : null}
