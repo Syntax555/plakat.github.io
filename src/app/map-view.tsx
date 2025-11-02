@@ -209,6 +209,20 @@ const textAreaClassName = [
 	'focus:ring-blue-500/30',
 ].join(' ')
 
+const mapContainerWrapperClass = [
+	'flex-1',
+	'overflow-hidden',
+	'rounded-lg',
+	'border',
+	'border-zinc-200',
+	'shadow-sm',
+].join(' ')
+
+const descriptionPlaceholder = [
+	'Notizen zur Platzierung,',
+	'z. B. Seite der Straße oder Besonderheiten',
+].join(' ')
+
 function isPinExpired(expiresAt: string): boolean {
 	const parsed = new Date(expiresAt)
 	if (Number.isNaN(parsed.getTime())) {
@@ -712,7 +726,7 @@ export function MapView() {
 					<p className='mt-2 text-sm text-zinc-500'>Pins werden geladen...</p>
 				) : null}
 			</div>
-			<div className='flex-1 overflow-hidden rounded-lg border border-zinc-200 shadow-sm'>
+			<div className={mapContainerWrapperClass}>
 				<MapContainer
 					center={defaultCenter}
 					zoom={15}
@@ -758,7 +772,7 @@ export function MapView() {
 											value={formState.description}
 											onChange={handleDescriptionChange}
 											rows={3}
-											placeholder='Notizen zur Platzierung, z. B. Seite der Straße oder Besonderheiten'
+											placeholder={descriptionPlaceholder}
 											className={textAreaClassName}
 										/>
 									</div>

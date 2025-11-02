@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
+import { VersionUpdatePrompt } from '../components/version-update-prompt'
 
 const geistSans = Geist({
 	variable: '--font-geist-sans',
@@ -24,14 +25,22 @@ const bodyClassName = [
 	'antialiased',
 ].join(' ')
 
+const metadataDescription = [
+	'Standorte für CSU-Plakate verwalten, teilen',
+	'und Abbau-Termine im Blick behalten.',
+].join(' ')
+
+const metadataOgDescription = [
+	'Finde alle Plakatstandorte',
+	'und die anstehenden Abbau-Termine der CSU Neu-Ulm.',
+].join(' ')
+
 export const metadata: Metadata = {
 	title: 'Plakatkarte CSU Neu-Ulm',
-	description:
-		'Standorte für CSU-Plakate verwalten, teilen und Abbau-Termine im Blick behalten.',
+	description: metadataDescription,
 	openGraph: {
 		title: 'Plakatkarte CSU Neu-Ulm',
-		description:
-			'Finde alle Plakatstandorte und die anstehenden Abbau-Termine der CSU Neu-Ulm.',
+		description: metadataOgDescription,
 	},
 }
 
@@ -41,12 +50,13 @@ export default function RootLayout({
 	children: React.ReactNode
 }>) {
 	return (
-			<html lang='de'>
-				<body
-					suppressHydrationWarning
-					className={bodyClassName}
-				>
+		<html lang='de'>
+			<body
+				suppressHydrationWarning
+				className={bodyClassName}
+			>
 				{children}
+				<VersionUpdatePrompt />
 			</body>
 		</html>
 	)
