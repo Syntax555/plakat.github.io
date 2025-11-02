@@ -15,6 +15,7 @@ import {
 } from 'react-leaflet'
 import L, { type LeafletMouseEvent } from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import { supabase } from '../lib/supabase-client'
 
 type Pin = {
 	id: string
@@ -80,16 +81,22 @@ function normalizePins(data: unknown): Pin[] {
 		const candidate = item as Partial<Pin> & {
 			latitude?: unknown
 			longitude?: unknown
+			created_at?: unknown
 		}
 
 		const id = typeof candidate.id === 'string' ? candidate.id : null
 		const title = typeof candidate.title === 'string' ? candidate.title : null
 		const latitude = Number(candidate.latitude)
 		const longitude = Number(candidate.longitude)
-		const createdAt =
-			typeof candidate.createdAt === 'string' &&
-			!Number.isNaN(Date.parse(candidate.createdAt))
+		const createdAtRaw =
+			typeof candidate.createdAt === 'string'
 				? candidate.createdAt
+				: typeof candidate.created_at === 'string'
+					? candidate.created_at
+					: null
+		const createdAt =
+			createdAtRaw && !Number.isNaN(Date.parse(createdAtRaw))
+				? createdAtRaw
 				: null
 
 		if (
@@ -121,6 +128,13 @@ function normalizePins(data: unknown): Pin[] {
 	)
 }
 
+function sortPins(entries: Pin[]): Pin[] {
+	return [...entries].sort(
+		(a, b) =>
+			new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+	)
+}
+
 export function MapView() {
 	const [pins, setPins] = useState<Pin[]>([])
 	const [isLoading, setIsLoading] = useState(true)
@@ -134,38 +148,119 @@ export function MapView() {
 	})
 	const [isSubmitting, setIsSubmitting] = useState(false)
 	const [deletingId, setDeletingId] = useState<string | null>(null)
+	const supabaseClient = supabase
 
-	const persistPins = useCallback((nextPins: Pin[]) => {
-		if (typeof window === 'undefined') {
-			return true
-		}
-		try {
-			window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextPins))
-			return true
-		} catch (storageError) {
-			console.error('Failed to persist pins', storageError)
-			return false
-		}
-	}, [])
+	const persistPins = useCallback(
+		(nextPins: Pin[]) => {
+			if (supabaseClient) {
+				return true
+			}
+			if (typeof window === 'undefined') {
+				return true
+			}
+			try {
+				window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextPins))
+				return true
+			} catch (storageError) {
+				console.error('Failed to persist pins', storageError)
+				return false
+			}
+		},
+		[supabaseClient],
+	)
 
 	useEffect(() => {
-		if (typeof window === 'undefined') {
+		if (!supabaseClient) {
+			if (typeof window === 'undefined') {
+				setIsLoading(false)
+				return
+			}
+
+			setIsLoading(true)
+			try {
+				const raw = window.localStorage.getItem(STORAGE_KEY)
+				const storedPins = raw ? normalizePins(JSON.parse(raw)) : []
+				setPins(storedPins)
+				setError(null)
+			} catch (loadError) {
+				console.error('Failed to load pins from storage', loadError)
+				setError('Die Pins konnten nicht geladen werden.')
+			} finally {
+				setIsLoading(false)
+			}
 			return
 		}
 
-		setIsLoading(true)
-		try {
-			const raw = window.localStorage.getItem(STORAGE_KEY)
-			const storedPins = raw ? normalizePins(JSON.parse(raw)) : []
-			setPins(storedPins)
-			setError(null)
-		} catch (loadError) {
-			console.error('Failed to load pins from storage', loadError)
-			setError('Die Pins konnten nicht geladen werden.')
-		} finally {
+		let isMounted = true
+
+		const loadPins = async () => {
+			setIsLoading(true)
+			const { data, error: loadError } = await supabaseClient
+				.from('pins')
+				.select('*')
+				.order('created_at', { ascending: false })
+
+			if (!isMounted) {
+				return
+			}
+
+			if (loadError) {
+				console.error('Failed to load pins from Supabase', loadError)
+				setError('Die Pins konnten nicht geladen werden.')
+			} else {
+				setPins(normalizePins(data ?? []))
+				setError(null)
+			}
+
 			setIsLoading(false)
 		}
-	}, [])
+
+		void loadPins()
+
+		const channel = supabaseClient
+			.channel('public:pins-stream')
+			.on(
+				'postgres_changes',
+				{ event: '*', schema: 'public', table: 'pins' },
+				payload => {
+					if (!payload) {
+						return
+					}
+
+					setPins(previousPins => {
+						if (payload.eventType === 'DELETE') {
+							const removedId =
+								typeof payload.old === 'object' && payload.old !== null
+									? (payload.old as { id?: string }).id
+									: undefined
+							if (!removedId) {
+								return previousPins
+							}
+							return previousPins.filter(pin => pin.id !== removedId)
+						}
+
+						const normalized = normalizePins(
+							payload.new ? [payload.new] : [],
+						)
+						if (!normalized.length) {
+							return previousPins
+						}
+
+						const [updatedPin] = normalized
+						const filtered = previousPins.filter(
+							pin => pin.id !== updatedPin.id,
+						)
+						return sortPins([updatedPin, ...filtered])
+					})
+				},
+			)
+			.subscribe()
+
+		return () => {
+			isMounted = false
+			void channel.unsubscribe()
+		}
+	}, [supabaseClient])
 
 	const handleMapClick = useCallback((event: LeafletMouseEvent) => {
 		setNewPinLocation([event.latlng.lat, event.latlng.lng])
@@ -173,7 +268,7 @@ export function MapView() {
 	}, [])
 
 	const submitNewPin = useCallback(
-		(event: React.FormEvent<HTMLFormElement>) => {
+		async (event: React.FormEvent<HTMLFormElement>) => {
 			event.preventDefault()
 			if (!newPinLocation) {
 				return
@@ -186,6 +281,52 @@ export function MapView() {
 			}
 
 			const trimmedDescription = formState.description.trim()
+
+			setIsSubmitting(true)
+
+			if (supabaseClient) {
+				try {
+					const newPinRecord = {
+						id: createPinId(),
+						title: trimmedTitle,
+						description: trimmedDescription ? trimmedDescription : null,
+						latitude: newPinLocation[0],
+						longitude: newPinLocation[1],
+						created_at: new Date().toISOString(),
+					}
+
+					const { data, error: insertError } = await supabaseClient
+						.from('pins')
+						.insert(newPinRecord)
+						.select()
+						.maybeSingle()
+
+					if (insertError || !data) {
+						console.error('Failed to insert pin via Supabase', insertError)
+						setError('Der Pin konnte nicht gespeichert werden.')
+					} else {
+						const [insertedPin] = normalizePins([data])
+						if (insertedPin) {
+							setPins(previous =>
+								sortPins([
+									insertedPin,
+									...previous.filter(pin => pin.id !== insertedPin.id),
+								]),
+							)
+						}
+						setNewPinLocation(null)
+						setFormState({ title: '', description: '' })
+						setError(null)
+					}
+				} catch (insertUnexpectedError) {
+					console.error('Unexpected Supabase error', insertUnexpectedError)
+					setError('Der Pin konnte nicht gespeichert werden.')
+				} finally {
+					setIsSubmitting(false)
+				}
+				return
+			}
+
 			const newPin: Pin = {
 				id: createPinId(),
 				title: trimmedTitle,
@@ -195,12 +336,10 @@ export function MapView() {
 				createdAt: new Date().toISOString(),
 			}
 
-			setIsSubmitting(true)
-
 			let storedSuccessfully = false
 
 			setPins(previous => {
-				const updated = [newPin, ...previous]
+				const updated = sortPins([newPin, ...previous])
 				storedSuccessfully = persistPins(updated)
 				return storedSuccessfully ? updated : previous
 			})
@@ -220,16 +359,40 @@ export function MapView() {
 			formState.title,
 			newPinLocation,
 			persistPins,
+			supabaseClient,
 		],
 	)
 
 	const handleDelete = useCallback(
-		(pinId: string) => {
+		async (pinId: string) => {
 			if (!pinId) {
 				return
 			}
 
 			setDeletingId(pinId)
+
+			if (supabaseClient) {
+				try {
+					const { error: deleteError } = await supabaseClient
+						.from('pins')
+						.delete()
+						.eq('id', pinId)
+
+					if (deleteError) {
+						console.error('Failed to delete pin via Supabase', deleteError)
+						setError('Der Pin konnte nicht geloescht werden.')
+					} else {
+						setPins(previous => previous.filter(pin => pin.id !== pinId))
+						setError(null)
+					}
+				} catch (deleteUnexpectedError) {
+					console.error('Unexpected Supabase delete error', deleteUnexpectedError)
+					setError('Der Pin konnte nicht geloescht werden.')
+				} finally {
+					setDeletingId(null)
+				}
+				return
+			}
 
 			let removalAttempted = false
 			let removalSucceeded = false
@@ -255,7 +418,7 @@ export function MapView() {
 
 			setDeletingId(null)
 		},
-		[persistPins],
+		[persistPins, supabaseClient],
 	)
 
 	const markers = useMemo(
