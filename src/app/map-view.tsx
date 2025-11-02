@@ -244,7 +244,7 @@ function PinPopupContent({ pin, onDelete, isDeleting }: PinPopupContentProps) {
 				className={deleteButtonClass}
 				disabled={isDeleting}
 			>
-				{isDeleting ? 'Wird geloescht...' : 'Pin loeschen'}
+				{isDeleting ? 'Wird gelöscht...' : 'Pin löschen'}
 			</button>
 		</div>
 	)
@@ -268,7 +268,7 @@ export function MapView() {
 	useEffect(() => {
 		if (!supabaseClient) {
 			setError(
-				'Supabase ist nicht konfiguriert. Bitte Umgebungsvariablen pruefen.',
+				'Supabase ist nicht konfiguriert. Bitte Umgebungsvariablen prüfen.',
 			)
 			setIsLoading(false)
 			return
@@ -426,7 +426,7 @@ export function MapView() {
 			}
 
 			const confirmed = window.confirm(
-				'Willst du diesen Pin wirklich loeschen?',
+				'Willst du diesen Pin wirklich löschen?',
 			)
 
 			if (!confirmed) {
@@ -449,14 +449,14 @@ export function MapView() {
 
 				if (deleteError) {
 					console.error('Failed to delete pin via Supabase', deleteError)
-					setError('Der Pin konnte nicht geloescht werden.')
+					setError('Der Pin konnte nicht gelöscht werden.')
 				} else {
 					setPins(previous => previous.filter(pin => pin.id !== pinId))
 					setError(null)
 				}
 			} catch (deleteUnexpectedError) {
 				console.error('Unexpected Supabase delete error', deleteUnexpectedError)
-				setError('Der Pin konnte nicht geloescht werden.')
+				setError('Der Pin konnte nicht gelöscht werden.')
 			} finally {
 				setDeletingId(null)
 			}
@@ -517,8 +517,8 @@ export function MapView() {
 					Karte der CSU Neu-Ulm
 				</h2>
 				<p className='mt-1 text-sm text-zinc-600'>
-					Tippe oder klicke auf die Karte, um einen neuen Standort fuer ein
-					Plakat zu setzen. Jeder Pin ist fuer alle sichtbar und kann mit einem
+					Tippe oder klicke auf die Karte, um einen neuen Standort für ein
+					Plakat zu setzen. Jeder Pin ist für alle sichtbar und kann mit einem
 					Titel sowie einer optionalen Beschreibung versehen werden.
 				</p>
 				{error ? (
@@ -574,7 +574,7 @@ export function MapView() {
 											value={formState.description}
 											onChange={handleDescriptionChange}
 											rows={3}
-											placeholder='Notizen zur Platzierung, z. B. Seite der Strasse oder Besonderheiten'
+											placeholder='Notizen zur Platzierung, z. B. Seite der Straße oder Besonderheiten'
 											className={textAreaClassName}
 										/>
 									</div>
