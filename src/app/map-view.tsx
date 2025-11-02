@@ -309,6 +309,14 @@ export function MapView() {
 				return
 			}
 
+			const confirmed = window.confirm(
+				'Willst du diesen Pin wirklich loeschen?',
+			)
+
+			if (!confirmed) {
+				return
+			}
+
 			setDeletingId(pinId)
 
 			if (!supabaseClient) {
