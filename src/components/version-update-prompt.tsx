@@ -5,9 +5,83 @@ import { useEffect, useRef, useState } from 'react'
 const CHECK_INTERVAL_MS = 60_000
 const AUTO_RELOAD_DELAY_MS = 30_000
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? ''
-const VERSION_ENDPOINT = BASE_PATH
-	? `${BASE_PATH}/version.json`
-	: '/version.json'
+
+type NextWindow = Window & {
+	__NEXT_DATA__?: {
+		assetPrefix?: string
+	}
+}
+
+const normalizeBasePath = (input: string | null | undefined) => {
+	if (!input) {
+		return ''
+	}
+
+	const trimmed = input.trim().replace(/\/+$/, '')
+	if (!trimmed || trimmed === '.') {
+		return ''
+	}
+
+	return trimmed.startsWith('/') ? trimmed : `/${trimmed}`
+}
+
+const detectBasePathFromDocument = () => {
+	if (typeof document === 'undefined' || typeof window === 'undefined') {
+		return ''
+	}
+
+	const scriptElements = Array.from(
+		document.querySelectorAll<HTMLScriptElement>('script[src*="/_next/"]'),
+	)
+
+	for (const script of scriptElements) {
+		const src = script.getAttribute('src')
+		if (!src) {
+			continue
+		}
+
+		try {
+			const url = new URL(src, window.location.origin)
+			const staticIndex = url.pathname.indexOf('/_next/')
+			if (staticIndex > 0) {
+				return url.pathname.slice(0, staticIndex)
+			}
+		} catch {
+			continue
+		}
+	}
+
+	if (window.location.hostname.endsWith('.github.io')) {
+		const segments = window.location.pathname.split('/').filter(Boolean)
+		if (segments.length > 0) {
+			return `/${segments[0]}`
+		}
+	}
+
+	return ''
+}
+
+const getVersionEndpoint = () => {
+	const envBasePath = normalizeBasePath(BASE_PATH)
+	if (envBasePath) {
+		return `${envBasePath}/version.json`
+	}
+
+	if (typeof window !== 'undefined') {
+		const nextWindow = window as NextWindow
+		const assetPrefix = normalizeBasePath(nextWindow.__NEXT_DATA__?.assetPrefix)
+		if (assetPrefix) {
+			return `${assetPrefix}/version.json`
+		}
+	}
+
+	const documentBasePath = normalizeBasePath(detectBasePathFromDocument())
+	if (documentBasePath) {
+		return `${documentBasePath}/version.json`
+	}
+
+	return '/version.json'
+}
 
 const overlayClass = [
 	'fixed',
@@ -93,10 +167,11 @@ export function VersionUpdatePrompt() {
 
 	useEffect(() => {
 		let subscribed = true
+		const versionEndpoint = getVersionEndpoint()
 
 		const checkVersion = async () => {
 			try {
-				const response = await fetch(`${VERSION_ENDPOINT}?ts=${Date.now()}`, {
+				const response = await fetch(`${versionEndpoint}?ts=${Date.now()}`, {
 					cache: 'no-store',
 				})
 				if (!response.ok) {
