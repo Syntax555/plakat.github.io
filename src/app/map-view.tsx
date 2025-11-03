@@ -16,7 +16,7 @@ import {
 	useMapEvents,
 } from 'react-leaflet'
 import L, { type LeafletMouseEvent } from 'leaflet'
-import 'leaflet/dist/leaflet.css'
+import './leaflet.css'
 import { supabase } from '../lib/supabase-client'
 
 type Pin = {

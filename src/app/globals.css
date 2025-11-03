@@ -113,6 +113,12 @@
 }
 
 @layer base {
+  html,
+  :host {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
   * {
     @apply border-border outline-ring/50;
   }
@@ -181,4 +187,10 @@
 
 .pin-marker--expired .pin-marker__pin::after {
   border-top-color: #dc2626;
+}
+
+/* Extend Leaflet defaults for wider user-select support */
+.leaflet-overlay-pane svg {
+  -webkit-user-select: none;
+  user-select: none;
 }

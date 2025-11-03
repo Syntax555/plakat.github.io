@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import Link from 'next/link'
 import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
@@ -47,6 +47,11 @@ export const metadata: Metadata = {
 	},
 }
 
+export const viewport: Viewport = {
+	width: 'device-width',
+	initialScale: 1,
+}
+
 export default function RootLayout({
 	children,
 }: Readonly<{
@@ -54,11 +59,6 @@ export default function RootLayout({
 }>) {
 	return (
 		<html lang='de'>
-			<head>
-				<meta charSet='utf-8' />
-				<meta httpEquiv='Content-Type' content='text/html; charset=utf-8' />
-				<meta name='viewport' content='width=device-width, initial-scale=1' />
-			</head>
 			<body
 				suppressHydrationWarning
 				className={bodyClassName}
