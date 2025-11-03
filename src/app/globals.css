@@ -193,6 +193,7 @@
 
 /* Extend Leaflet defaults for wider user-select support */
 .leaflet-overlay-pane svg {
+  -moz-user-select: none;
   -webkit-user-select: none;
   user-select: none;
 }
