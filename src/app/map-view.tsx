@@ -35,6 +35,25 @@ type FormState = {
 	expiresAt: string
 }
 
+const ACCESS_HASH = process.env.NEXT_PUBLIC_ACCESS_HASH ?? ''
+const ACCESS_STORAGE_KEY = 'plakat-access-hash'
+
+const toHexString = (buffer: ArrayBuffer) =>
+	Array.from(new Uint8Array(buffer))
+		.map(byte => byte.toString(16).padStart(2, '0'))
+		.join('')
+
+const computeSHA256 = async (value: string) => {
+	if (!globalThis.crypto?.subtle) {
+		throw new Error('Kryptografische Funktionen werden nicht unterstützt.')
+	}
+
+	const encoder = new TextEncoder()
+	const data = encoder.encode(value)
+	const digest = await globalThis.crypto.subtle.digest('SHA-256', data)
+	return toHexString(digest)
+}
+
 const getTodayDateInputValue = () => {
 	const now = new Date()
 	// Normalize to local timezone so HTML date inputs show the correct day
@@ -84,6 +103,99 @@ const expiredIcon = L.divIcon({
 		<span class="pin-marker__shadow"></span>
 	`,
 })
+
+type PasswordGateProps = {
+	onSuccess: () => void
+}
+
+const PasswordGate = ({ onSuccess }: PasswordGateProps) => {
+	const [password, setPassword] = useState('')
+	const [error, setError] = useState<string | null>(null)
+	const [isVerifying, setIsVerifying] = useState(false)
+
+	const handlePasswordChange = useCallback(
+		(event: ChangeEvent<HTMLInputElement>) => {
+			setPassword(event.target.value)
+			if (error) {
+				setError(null)
+			}
+		},
+		[error],
+	)
+
+	const handleSubmit = useCallback(
+		async (event: FormEvent<HTMLFormElement>) => {
+			event.preventDefault()
+			if (!ACCESS_HASH) {
+				setError('Zugriff ist nicht konfiguriert.')
+				return
+			}
+
+			setIsVerifying(true)
+			try {
+				const hashedInput = await computeSHA256(password)
+				if (hashedInput === ACCESS_HASH) {
+					if (typeof window !== 'undefined') {
+						window.localStorage.setItem(ACCESS_STORAGE_KEY, hashedInput)
+					}
+					setPassword('')
+					setError(null)
+					onSuccess()
+				} else {
+					setError('Falsches Passwort.')
+				}
+			} catch (hashError) {
+				console.error('Passwortprüfung fehlgeschlagen', hashError)
+				setError('Passwortprüfung ist derzeit nicht möglich.')
+			} finally {
+				setIsVerifying(false)
+			}
+		},
+		[password, onSuccess],
+	)
+
+	return (
+		<div className='flex h-full min-h-screen flex-col items-center justify-center bg-zinc-100 p-4'>
+			<div className='w-full max-w-sm rounded-lg bg-white p-6 shadow-sm'>
+				<h1 className='text-lg font-semibold text-zinc-900'>
+					Zugriff geschützt
+				</h1>
+				<p className='mt-2 text-sm text-zinc-600'>
+					Bitte gib das Passwort ein, um die Karte zu öffnen.
+				</p>
+				<form className='mt-4 space-y-3' onSubmit={handleSubmit}>
+					<div className='space-y-1'>
+						<label
+							className='text-sm font-medium text-zinc-900'
+							htmlFor='access-password'
+						>
+							Passwort
+						</label>
+						<input
+							id='access-password'
+							type='password'
+							value={password}
+							onChange={handlePasswordChange}
+							required
+							autoComplete='current-password'
+							className='w-full rounded border border-zinc-300 px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500'
+						/>
+					</div>
+					{error ? (
+						<p className='text-sm text-red-600'>{error}</p>
+					) : null}
+					<button
+						type='submit'
+						className='w-full rounded bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 disabled:opacity-60'
+						disabled={isVerifying}
+					>
+						{isVerifying ? 'Wird geprüft...' : 'Freischalten'}
+					</button>
+				</form>
+			</div>
+		</div>
+	)
+}
 
 const deleteButtonClass = [
 	'w-full',
@@ -422,6 +534,8 @@ function PinPopupContent({
 }
 
 export function MapView() {
+	const [isAuthenticated, setIsAuthenticated] = useState(() => !ACCESS_HASH)
+	const [isAuthReady, setIsAuthReady] = useState(() => !ACCESS_HASH)
 	const [pins, setPins] = useState<Pin[]>([])
 	const [isLoading, setIsLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
@@ -434,6 +548,25 @@ export function MapView() {
 	const supabaseClient = supabase
 
 	useEffect(() => {
+		if (!ACCESS_HASH) {
+			return
+		}
+		if (typeof window === 'undefined') {
+			return
+		}
+
+		const storedHash = window.localStorage.getItem(ACCESS_STORAGE_KEY)
+		if (storedHash && storedHash === ACCESS_HASH) {
+			setIsAuthenticated(true)
+		}
+		setIsAuthReady(true)
+	}, [])
+
+	useEffect(() => {
+		if (!isAuthenticated) {
+			return
+		}
+
 		if (!supabaseClient) {
 			setError(
 				'Supabase ist nicht konfiguriert. Bitte Umgebungsvariablen prüfen.',
@@ -511,7 +644,7 @@ export function MapView() {
 			isMounted = false
 			void channel.unsubscribe()
 		}
-	}, [supabaseClient])
+	}, [isAuthenticated, supabaseClient])
 
 	const handleMapClick = useCallback((event: LeafletMouseEvent) => {
 		setNewPinLocation([event.latlng.lat, event.latlng.lng])
@@ -709,6 +842,21 @@ export function MapView() {
 			}),
 		[deletingId, handleDelete, pins],
 	)
+
+	if (!isAuthReady) {
+		return null
+	}
+
+	if (!isAuthenticated) {
+		return (
+			<PasswordGate
+				onSuccess={() => {
+					setIsAuthenticated(true)
+					setIsAuthReady(true)
+				}}
+			/>
+		)
+	}
 
 	return (
 		<div className='flex h-full flex-col gap-4'>
