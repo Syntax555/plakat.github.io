@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 import { VersionUpdatePrompt } from '../components/version-update-prompt'
@@ -56,6 +57,25 @@ export default function RootLayout({
 				className={bodyClassName}
 			>
 				{children}
+				<footer className='mt-12 border-t border-zinc-200 bg-white/80'>
+					<div className='mx-auto flex max-w-4xl flex-col items-center gap-2 px-4 py-6 text-sm text-zinc-600 sm:flex-row sm:justify-between'>
+						<p>&copy; {new Date().getFullYear()} Tolga Kaan Eskin</p>
+						<nav className='flex items-center gap-4'>
+							<Link
+								className='hover:text-zinc-900'
+								href='/impressum'
+							>
+								Impressum
+							</Link>
+							<Link
+								className='hover:text-zinc-900'
+								href='/datenschutz'
+							>
+								Datenschutz
+							</Link>
+						</nav>
+					</div>
+				</footer>
 				<VersionUpdatePrompt />
 			</body>
 		</html>
