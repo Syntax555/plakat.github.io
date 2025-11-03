@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 
 const TILE_BASE_URL = 'https://tile.openstreetmap.org'
 const TILE_USER_AGENT =
@@ -11,10 +11,10 @@ const isTileFilename = (value: string) => /^[0-9]+\.png$/.test(value)
 export const revalidate = 60 * 60 // cache successful responses for 1 hour
 
 export async function GET(
-	_request: Request,
-	{ params }: { params: { z?: string; x?: string; y?: string } },
+	_request: NextRequest,
+	context: { params: Promise<{ z: string; x: string; y: string }> },
 ) {
-	const { z, x, y } = params
+	const { z, x, y } = await context.params
 
 	if (!z || !x || !y || !isCoordinate(z) || !isCoordinate(x) || !isTileFilename(y)) {
 		return NextResponse.json(
