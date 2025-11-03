@@ -295,6 +295,17 @@ const legendDotPendingClass = [legendDotBaseClass, 'bg-orange-500'].join(' ')
 
 const legendDotExpiredClass = [legendDotBaseClass, 'bg-red-600'].join(' ')
 
+const legendCountBadgeClass = [
+	'rounded-full',
+	'bg-zinc-100',
+	'px-2',
+	'py-0.5',
+	'text-xs',
+	'font-semibold',
+	'text-zinc-700',
+	'leading-none',
+].join(' ')
+
 const infoPanelCardClass = [
 	'overflow-hidden',
 	'rounded-lg',
@@ -413,22 +424,29 @@ function formatDateShort(value: string): string {
 	})
 }
 
-function MapLegend() {
+type MapLegendProps = {
+	hangingCount: number
+	expiredCount: number
+}
+
+function MapLegend({ hangingCount, expiredCount }: MapLegendProps) {
 	return (
 		<div className={legendContainerClass}>
 			<p className={legendLabelClass}>Legende:</p>
 			<div className={legendListClass}>
 				<div className={legendItemClass}>
 					<span className={legendDotDefaultClass} />
-					<span>Bestehender Pin</span>
+					<span>Blau: Hängendes Plakat</span>
+					<span className={legendCountBadgeClass}>{hangingCount}</span>
 				</div>
 				<div className={legendItemClass}>
 					<span className={legendDotPendingClass} />
-					<span>Neuer Pin (noch nicht gespeichert)</span>
+					<span>Orange: Neuer Pin (noch nicht gespeichert)</span>
 				</div>
 				<div className={legendItemClass}>
 					<span className={legendDotExpiredClass} />
-					<span>Abbau überfällig (bitte prüfen)</span>
+					<span>Rot: Abbau überfällig (bitte prüfen)</span>
+					<span className={legendCountBadgeClass}>{expiredCount}</span>
 				</div>
 			</div>
 		</div>
@@ -897,6 +915,22 @@ export function MapView() {
 		setFormState(createInitialFormState())
 	}, [])
 
+	const pinStatusCounts = useMemo(
+		() =>
+			pins.reduce(
+				(accumulator, pin) => {
+					if (isPinExpired(pin.expiresAt)) {
+						accumulator.expired += 1
+					} else {
+						accumulator.hanging += 1
+					}
+					return accumulator
+				},
+				{ hanging: 0, expired: 0 },
+			),
+		[pins],
+	)
+
 	const markers = useMemo(
 		() =>
 			pins.map(pin => {
@@ -984,7 +1018,10 @@ export function MapView() {
 						Bitte hinterlege auch einen Abbau-Termin, damit fällige Plakate
 						schnell erkannt und entfernt werden können.
 					</p>
-					<MapLegend />
+					<MapLegend
+						hangingCount={pinStatusCounts.hanging}
+						expiredCount={pinStatusCounts.expired}
+					/>
 				</div>
 				{error ? (
 					<div className='border-t border-red-100 bg-red-50 px-4 py-3'>
