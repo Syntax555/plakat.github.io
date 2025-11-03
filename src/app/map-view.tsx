@@ -713,9 +713,6 @@ export function MapView() {
 	return (
 		<div className='flex h-full flex-col gap-4'>
 			<div className='rounded-lg bg-white p-4 shadow-sm cursor-default'>
-				<h2 className='text-lg font-semibold text-zinc-900'>
-					Karte der CSU Neu-Ulm
-				</h2>
 				<p className='mt-1 text-sm text-zinc-600'>
 					Tippe oder klicke auf die Karte, um einen neuen Standort für ein
 					Plakat zu setzen. Jeder Pin ist für alle sichtbar und kann mit einem
