@@ -9,5 +9,13 @@ const version =
 	'dev'
 
 export function GET() {
-	return NextResponse.json({ version })
+	return NextResponse.json(
+		{ version },
+		{
+			headers: {
+				'Cache-Control': 'no-store, max-age=0',
+				'Content-Type': 'application/json; charset=utf-8',
+			},
+		},
+	)
 }
