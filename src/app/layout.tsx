@@ -57,18 +57,21 @@ export default function RootLayout({
 				className={bodyClassName}
 			>
 				{children}
-				<footer className='mt-12 border-t border-zinc-200 bg-white/80'>
-					<div className='mx-auto flex max-w-4xl flex-col items-center gap-2 px-4 py-6 text-sm text-zinc-600 sm:flex-row sm:justify-between'>
-						<p>&copy; {new Date().getFullYear()} Tolga Kaan Eskin</p>
-						<nav className='flex items-center gap-4'>
+				<footer className='mt-12 border-t border-zinc-200 bg-white/90'>
+					<div className='mx-auto flex w-full max-w-5xl flex-col gap-3 px-4 py-6 text-sm text-zinc-600 md:flex-row md:items-center md:justify-between'>
+						<p className='text-center md:text-left'>
+							Copyright © {new Date().getFullYear()} Tolga Kaan Eskin. Alle
+							Rechte vorbehalten.
+						</p>
+						<nav className='flex items-center justify-center gap-6 md:justify-end'>
 							<Link
-								className='hover:text-zinc-900'
+								className='transition-colors hover:text-zinc-900'
 								href='/impressum'
 							>
 								Impressum
 							</Link>
 							<Link
-								className='hover:text-zinc-900'
+								className='transition-colors hover:text-zinc-900'
 								href='/datenschutz'
 							>
 								Datenschutz
