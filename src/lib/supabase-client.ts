@@ -1,26 +1,31 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
-const requiredEnv = (key: 'NEXT_PUBLIC_SUPABASE_URL' | 'NEXT_PUBLIC_SUPABASE_ANON_KEY') => {
-	const value = process.env[key]
+type SupabaseEnvKey = 'NEXT_PUBLIC_SUPABASE_URL' | 'NEXT_PUBLIC_SUPABASE_ANON_KEY'
 
+const readEnv = (key: SupabaseEnvKey) => {
+	const value = process.env[key]
 	if (!value) {
-		throw new Error(
+		console.warn(
 			`Missing Supabase configuration. Set ${key} in your environment before building the app.`,
 		)
 	}
-
 	return value
 }
 
-let cachedClient: SupabaseClient | null = null
+let cachedClient: SupabaseClient | null | undefined
 
-export const getSupabaseClient = () => {
-	if (cachedClient) {
+export const getSupabaseClient = (): SupabaseClient | null => {
+	if (cachedClient !== undefined) {
 		return cachedClient
 	}
 
-	const supabaseUrl = requiredEnv('NEXT_PUBLIC_SUPABASE_URL')
-	const supabaseAnonKey = requiredEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY')
+	const supabaseUrl = readEnv('NEXT_PUBLIC_SUPABASE_URL')
+	const supabaseAnonKey = readEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY')
+
+	if (!supabaseUrl || !supabaseAnonKey) {
+		cachedClient = null
+		return cachedClient
+	}
 
 	cachedClient = createClient(supabaseUrl, supabaseAnonKey, {
 		auth: {
