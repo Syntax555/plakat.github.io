@@ -75,18 +75,6 @@ export default function RootLayout({
 							>
 								Zur Karte
 							</Link>
-							<Link
-								className='rounded-md bg-blue-800/50 px-4 py-2 text-blue-100 transition hover:bg-blue-700'
-								href='/impressum'
-							>
-								Impressum
-							</Link>
-							<Link
-								className='rounded-md bg-blue-800/50 px-4 py-2 text-blue-100 transition hover:bg-blue-700'
-								href='/datenschutz'
-							>
-								Datenschutz
-							</Link>
 						</nav>
 					</div>
 				</header>
