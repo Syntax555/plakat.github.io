@@ -19,6 +19,8 @@ const geistMono = Geist_Mono({
 const bodyClassName = [
 	geistSans.variable,
 	geistMono.variable,
+	'flex',
+	'flex-col',
 	'min-h-screen',
 	'bg-zinc-50',
 	'font-sans',
@@ -56,7 +58,7 @@ export default function RootLayout({
 				suppressHydrationWarning
 				className={bodyClassName}
 			>
-				{children}
+				<div className='flex-1'>{children}</div>
 				<footer className='mt-12 border-t border-zinc-200 bg-white/90'>
 					<div className='mx-auto flex w-full max-w-5xl flex-col gap-3 px-4 py-6 text-sm text-zinc-600 md:flex-row md:items-center md:justify-between'>
 						<p className='text-center md:text-left'>
