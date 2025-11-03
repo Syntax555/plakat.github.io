@@ -295,6 +295,50 @@ const legendDotPendingClass = [legendDotBaseClass, 'bg-orange-500'].join(' ')
 
 const legendDotExpiredClass = [legendDotBaseClass, 'bg-red-600'].join(' ')
 
+const infoPanelCardClass = [
+	'overflow-hidden',
+	'rounded-lg',
+	'bg-white',
+	'shadow-sm',
+].join(' ')
+
+const infoPanelToggleButtonClass = [
+	'flex',
+	'w-full',
+	'items-center',
+	'justify-between',
+	'gap-3',
+	'px-4',
+	'py-3',
+	'text-left',
+	'text-sm',
+	'font-semibold',
+	'text-blue-900',
+	'transition',
+	'duration-150',
+	'hover:bg-blue-50',
+	'focus-visible:outline-none',
+	'focus-visible:ring-2',
+	'focus-visible:ring-blue-400/70',
+].join(' ')
+
+const infoPanelIconClass = [
+	'h-5',
+	'w-5',
+	'flex-shrink-0',
+	'text-blue-900',
+	'transition-transform',
+	'duration-200',
+].join(' ')
+
+const infoPanelBodyBaseClass = [
+	'space-y-3',
+	'border-t',
+	'border-zinc-200',
+	'px-4',
+	'py-4',
+].join(' ')
+
 const tileLayerAttribution = [
 	'&copy; <a href="https://www.openstreetmap.org/copyright">',
 	'OpenStreetMap</a> Mitwirkende',
@@ -327,6 +371,10 @@ const textAreaClassName = [
 	'focus:ring-2',
 	'focus:ring-blue-500/30',
 ].join(' ')
+
+const INFO_PANEL_STORAGE_KEY = 'plakat-info-panel-open'
+const INFO_PANEL_OPEN = 'open'
+const INFO_PANEL_CLOSED = 'closed'
 
 const mapContainerWrapperClass = [
 	'flex-1',
@@ -545,7 +593,34 @@ export function MapView() {
 	const [formState, setFormState] = useState<FormState>(createInitialFormState)
 	const [isSubmitting, setIsSubmitting] = useState(false)
 	const [deletingId, setDeletingId] = useState<string | null>(null)
+	const [isInfoOpen, setIsInfoOpen] = useState(true)
 	const supabaseClient = supabase
+
+	useEffect(() => {
+		if (typeof window === 'undefined') {
+			return
+		}
+
+		const storedState = window.localStorage.getItem(INFO_PANEL_STORAGE_KEY)
+		if (storedState === INFO_PANEL_CLOSED) {
+			setIsInfoOpen(false)
+		}
+	}, [])
+
+	useEffect(() => {
+		if (typeof window === 'undefined') {
+			return
+		}
+
+		try {
+			window.localStorage.setItem(
+				INFO_PANEL_STORAGE_KEY,
+				isInfoOpen ? INFO_PANEL_OPEN : INFO_PANEL_CLOSED,
+			)
+		} catch (storageError) {
+			console.warn('Failed to persist info panel state', storageError)
+		}
+	}, [isInfoOpen])
 
 	useEffect(() => {
 		if (!ACCESS_HASH) {
@@ -649,6 +724,10 @@ export function MapView() {
 	const handleMapClick = useCallback((event: LeafletMouseEvent) => {
 		setNewPinLocation([event.latlng.lat, event.latlng.lng])
 		setFormState(createInitialFormState())
+	}, [])
+
+	const toggleInfoPanel = useCallback(() => {
+		setIsInfoOpen(previous => !previous)
 	}, [])
 
 	const submitNewPin = useCallback(
@@ -859,30 +938,69 @@ export function MapView() {
 	}
 
 	return (
-		<div className='flex h-full flex-col gap-4'>
-			<div className='rounded-lg bg-white p-4 shadow-sm cursor-default'>
-				<p className='mt-1 text-sm text-zinc-600'>
-					Tippe oder klicke auf die Karte, um einen neuen Standort für ein
-					Plakat zu setzen. Jeder Pin ist für alle sichtbar und kann mit einem
-					Titel sowie einer optionalen Beschreibung versehen werden.
-				</p>
-				<p className='mt-1 text-sm text-zinc-600'>
-					Bitte hinterlege auch einen Abbau-Termin, damit fällige Plakate
-					schnell erkannt und entfernt werden können.
-				</p>
-				<MapLegend />
+		<div className='flex h-full min-h-0 flex-col gap-4'>
+			<div className={infoPanelCardClass}>
+				<button
+					type='button'
+					onClick={toggleInfoPanel}
+					className={infoPanelToggleButtonClass}
+					aria-expanded={isInfoOpen}
+					aria-controls='map-info-panel'
+				>
+					<span>Hinweise &amp; Legende</span>
+					<svg
+						className={`${infoPanelIconClass} ${isInfoOpen ? 'rotate-180' : ''}`}
+						viewBox='0 0 24 24'
+						fill='none'
+						aria-hidden='true'
+					>
+						<path
+							d='M6 7.5L12 13.5L18 7.5'
+							stroke='currentColor'
+							strokeWidth='1.8'
+							strokeLinecap='round'
+							strokeLinejoin='round'
+						/>
+						<path
+							d='M6 12L12 18L18 12'
+							stroke='currentColor'
+							strokeWidth='1.8'
+							strokeLinecap='round'
+							strokeLinejoin='round'
+						/>
+					</svg>
+				</button>
+				<div
+					id='map-info-panel'
+					className={`${infoPanelBodyBaseClass} ${isInfoOpen ? 'block' : 'hidden'}`}
+				>
+					<p className='text-sm text-zinc-600'>
+						Tippe oder klicke auf die Karte, um einen neuen Standort für ein
+						Plakat zu setzen. Jeder Pin ist für alle sichtbar und kann mit einem
+						Titel sowie einer optionalen Beschreibung versehen werden.
+					</p>
+					<p className='text-sm text-zinc-600'>
+						Bitte hinterlege auch einen Abbau-Termin, damit fällige Plakate
+						schnell erkannt und entfernt werden können.
+					</p>
+					<MapLegend />
+				</div>
 				{error ? (
-					<p className='mt-2 text-sm text-red-600'>{error}</p>
+					<div className='border-t border-red-100 bg-red-50 px-4 py-3'>
+						<p className='text-sm text-red-600'>{error}</p>
+					</div>
 				) : null}
 				{isLoading ? (
-					<p className='mt-2 text-sm text-zinc-500'>Pins werden geladen...</p>
+					<div className='border-t border-zinc-200 px-4 py-3'>
+						<p className='text-sm text-zinc-500'>Pins werden geladen...</p>
+					</div>
 				) : null}
 			</div>
 			<div className={mapContainerWrapperClass}>
 				<MapContainer
 					center={defaultCenter}
 					zoom={15}
-					className='h-[70vh] w-full md:h-[calc(100vh-220px)]'
+					className='h-full min-h-[320px] w-full'
 					scrollWheelZoom
 				>
 					<TileLayer
