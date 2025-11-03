@@ -70,8 +70,7 @@ const createInitialFormState = (): FormState => ({
 const SUPABASE_TABLE = 'Pins'
 
 const defaultCenter: [number, number] = [48.392578, 10.011085]
-const tileProxyBasePath = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/api/tiles`
-const tileLayerUrl = `${tileProxyBasePath}/{z}/{x}/{y}.png`
+const tileLayerUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
 
 const defaultIcon = L.divIcon({
 	className: 'pin-marker',
@@ -1043,10 +1042,7 @@ export function MapView() {
 					className='h-[60vh] min-h-[360px] w-full md:min-h-[480px] lg:min-h-[560px]'
 					scrollWheelZoom
 				>
-					<TileLayer
-						attribution={tileLayerAttribution}
-						url={tileLayerUrl}
-					/>
+					<TileLayer attribution={tileLayerAttribution} url={tileLayerUrl} />
 					<MapClickHandler onClick={handleMapClick} />
 					{markers}
 					{newPinLocation ? (
