@@ -82,7 +82,7 @@ export default function RootLayout({
 				<footer className='mt-12 border-t border-zinc-200 bg-white/90'>
 					<div className='mx-auto flex w-full max-w-5xl flex-col gap-3 px-4 py-6 text-sm text-zinc-600 md:flex-row md:items-center md:justify-between'>
 						<p className='text-center md:text-left'>
-							Copyright \u00a9 {new Date().getFullYear()} Tolga Kaan Eskin. Alle
+							Copyright &copy; {new Date().getFullYear()} Tolga Kaan Eskin. Alle
 							Rechte vorbehalten.
 						</p>
 						<nav className='flex items-center justify-center gap-6 md:justify-end'>

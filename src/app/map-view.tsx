@@ -378,6 +378,7 @@ const INFO_PANEL_CLOSED = 'closed'
 
 const mapContainerWrapperClass = [
 	'flex-1',
+	'min-h-[360px]',
 	'overflow-hidden',
 	'rounded-lg',
 	'border',
@@ -1000,7 +1001,7 @@ export function MapView() {
 				<MapContainer
 					center={defaultCenter}
 					zoom={15}
-					className='h-full min-h-[320px] w-full'
+					className='h-[60vh] min-h-[360px] w-full md:min-h-[480px] lg:min-h-[560px]'
 					scrollWheelZoom
 				>
 					<TileLayer
