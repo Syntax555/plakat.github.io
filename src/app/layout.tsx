@@ -29,7 +29,7 @@ const bodyClassName = [
 ].join(' ')
 
 const metadataDescription = [
-	'Standorte für CSU-Plakate verwalten, teilen',
+	'Standorte f\u00fcr CSU-Plakate verwalten, teilen',
 	'und Abbau-Termine im Blick behalten.',
 ].join(' ')
 
@@ -58,11 +58,43 @@ export default function RootLayout({
 				suppressHydrationWarning
 				className={bodyClassName}
 			>
-				<div className='flex-1'>{children}</div>
+				<header className='bg-blue-900 px-6 py-5 text-white shadow'>
+					<div className='mx-auto flex w-full max-w-5xl flex-col gap-4 md:flex-row md:items-center md:justify-between'>
+						<div>
+							<p className='text-sm uppercase tracking-wide text-blue-200'>
+								CSU Neu-Ulm
+							</p>
+							<h1 className='text-2xl font-semibold'>
+								Plakat-Planung auf einen Blick
+							</h1>
+						</div>
+						<nav className='flex flex-wrap items-center gap-3 text-sm font-semibold'>
+							<Link
+								className='rounded-md bg-white px-4 py-2 text-blue-900 shadow transition hover:bg-blue-100'
+								href='/'
+							>
+								Zur Karte
+							</Link>
+							<Link
+								className='rounded-md bg-blue-800/50 px-4 py-2 text-blue-100 transition hover:bg-blue-700'
+								href='/impressum'
+							>
+								Impressum
+							</Link>
+							<Link
+								className='rounded-md bg-blue-800/50 px-4 py-2 text-blue-100 transition hover:bg-blue-700'
+								href='/datenschutz'
+							>
+								Datenschutz
+							</Link>
+						</nav>
+					</div>
+				</header>
+				<div className='flex-1 w-full'>{children}</div>
 				<footer className='mt-12 border-t border-zinc-200 bg-white/90'>
 					<div className='mx-auto flex w-full max-w-5xl flex-col gap-3 px-4 py-6 text-sm text-zinc-600 md:flex-row md:items-center md:justify-between'>
 						<p className='text-center md:text-left'>
-							Copyright © {new Date().getFullYear()} Tolga Kaan Eskin. Alle
+							Copyright \u00a9 {new Date().getFullYear()} Tolga Kaan Eskin. Alle
 							Rechte vorbehalten.
 						</p>
 						<nav className='flex items-center justify-center gap-6 md:justify-end'>
