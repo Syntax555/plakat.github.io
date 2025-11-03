@@ -17,7 +17,7 @@ import {
 } from 'react-leaflet'
 import L, { type LeafletMouseEvent } from 'leaflet'
 import './leaflet.css'
-import { supabase } from '../lib/supabase-client'
+import { getSupabaseClient } from '../lib/supabase-client'
 
 type Pin = {
 	id: string
@@ -67,6 +67,7 @@ const createInitialFormState = (): FormState => ({
 	expiresAt: getTodayDateInputValue(),
 })
 
+const supabase = getSupabaseClient()
 const SUPABASE_TABLE = 'Pins'
 
 const defaultCenter: [number, number] = [48.392578, 10.011085]
