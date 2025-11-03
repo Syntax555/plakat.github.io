@@ -4,6 +4,10 @@ import { useEffect, useRef, useState } from 'react'
 
 const CHECK_INTERVAL_MS = 60_000
 const AUTO_RELOAD_DELAY_MS = 30_000
+const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? ''
+const VERSION_ENDPOINT = BASE_PATH
+	? `${BASE_PATH}/version.json`
+	: '/version.json'
 
 const overlayClass = [
 	'fixed',
@@ -92,7 +96,7 @@ export function VersionUpdatePrompt() {
 
 		const checkVersion = async () => {
 			try {
-				const response = await fetch('/api/version', {
+				const response = await fetch(`${VERSION_ENDPOINT}?ts=${Date.now()}`, {
 					cache: 'no-store',
 				})
 				if (!response.ok) {
