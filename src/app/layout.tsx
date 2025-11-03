@@ -59,6 +59,12 @@ export default function RootLayout({
 }>) {
 	return (
 		<html lang='de'>
+			<head>
+				<meta
+					httpEquiv='Cache-Control'
+					content='public, max-age=600, stale-while-revalidate=60'
+				/>
+			</head>
 			<body
 				suppressHydrationWarning
 				className={bodyClassName}
