@@ -13,6 +13,7 @@ import {
 	Marker,
 	Popup,
 	TileLayer,
+	useMap,
 	useMapEvents,
 } from 'react-leaflet'
 import L, { type LeafletMouseEvent } from 'leaflet'
@@ -105,6 +106,173 @@ const expiredIcon = L.divIcon({
 		<span class="pin-marker__shadow"></span>
 	`,
 })
+
+type VendorDocument = Document & {
+	webkitExitFullscreen?: () => Promise<void> | void
+	webkitFullscreenElement?: Element | null
+	mozCancelFullScreen?: () => Promise<void> | void
+	mozFullScreenElement?: Element | null
+	msExitFullscreen?: () => Promise<void> | void
+	msFullscreenElement?: Element | null
+}
+
+type VendorHTMLElement = HTMLElement & {
+	webkitRequestFullscreen?: () => Promise<void> | void
+	mozRequestFullScreen?: () => Promise<void> | void
+	msRequestFullscreen?: () => Promise<void> | void
+}
+
+const FULLSCREEN_CHANGE_EVENTS = [
+	'fullscreenchange',
+	'webkitfullscreenchange',
+	'mozfullscreenchange',
+	'MSFullscreenChange',
+] as const
+
+const getFullscreenElement = (doc: VendorDocument) =>
+	doc.fullscreenElement ??
+	doc.webkitFullscreenElement ??
+	doc.mozFullScreenElement ??
+	doc.msFullscreenElement ??
+	null
+
+const requestFullscreen = (element: VendorHTMLElement) => {
+	if (element.requestFullscreen) {
+		return element.requestFullscreen()
+	}
+	if (element.webkitRequestFullscreen) {
+		return element.webkitRequestFullscreen()
+	}
+	if (element.mozRequestFullScreen) {
+		return element.mozRequestFullScreen()
+	}
+	if (element.msRequestFullscreen) {
+		return element.msRequestFullscreen()
+	}
+	return Promise.resolve()
+}
+
+const exitFullscreen = (doc: VendorDocument) => {
+	if (doc.exitFullscreen) {
+		return doc.exitFullscreen()
+	}
+	if (doc.webkitExitFullscreen) {
+		return doc.webkitExitFullscreen()
+	}
+	if (doc.mozCancelFullScreen) {
+		return doc.mozCancelFullScreen()
+	}
+	if (doc.msExitFullscreen) {
+		return doc.msExitFullscreen()
+	}
+	return Promise.resolve()
+}
+
+const isFullscreenSupported = (
+	element: VendorHTMLElement,
+	doc: VendorDocument,
+) =>
+	Boolean(
+		element.requestFullscreen ??
+			element.webkitRequestFullscreen ??
+			element.mozRequestFullScreen ??
+			element.msRequestFullscreen ??
+			doc.exitFullscreen ??
+			doc.webkitExitFullscreen ??
+			doc.mozCancelFullScreen ??
+			doc.msExitFullscreen,
+	)
+
+const FullscreenControl = () => {
+	const map = useMap()
+
+	useEffect(() => {
+		const mapContainer = map.getContainer() as VendorHTMLElement | null
+		if (!mapContainer || typeof document === 'undefined') {
+			return
+		}
+
+		const doc = document as VendorDocument
+
+		if (!isFullscreenSupported(mapContainer, doc)) {
+			return
+		}
+
+		const control = L.control({ position: 'topright' })
+		let button: HTMLButtonElement | null = null
+
+		const updateButtonState = () => {
+			if (!button) {
+				return
+			}
+			const isActive = getFullscreenElement(doc) === mapContainer
+			button.setAttribute('aria-pressed', String(isActive))
+			button.classList.toggle('is-active', isActive)
+			mapContainer.classList.toggle('leaflet-container--fullscreen', isActive)
+		}
+
+		const handleToggle = (event: Event) => {
+			event.preventDefault()
+			event.stopPropagation()
+
+			const isActive = getFullscreenElement(doc) === mapContainer
+			if (isActive) {
+				void exitFullscreen(doc)
+			} else {
+				void requestFullscreen(mapContainer)
+			}
+		}
+
+		control.onAdd = () => {
+			const wrapper = L.DomUtil.create(
+				'div',
+				'leaflet-bar leaflet-control',
+			) as HTMLDivElement
+			button = L.DomUtil.create(
+				'button',
+				'leaflet-control-fullscreen-button',
+				wrapper,
+			) as HTMLButtonElement
+			button.type = 'button'
+			button.setAttribute('aria-label', 'Vollbild umschalten')
+			button.setAttribute('aria-pressed', 'false')
+			button.innerHTML = `
+				<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+					<path d="M8 4H5a1 1 0 0 0-1 1v3" />
+					<path d="M16 4h3a1 1 0 0 1 1 1v3" />
+					<path d="M20 16v3a1 1 0 0 1-1 1h-3" />
+					<path d="M4 16v3a1 1 0 0 0 1 1h3" />
+				</svg>
+			`
+			L.DomEvent.disableClickPropagation(button)
+			button.addEventListener('click', handleToggle)
+			return wrapper
+		}
+
+		control.addTo(map)
+
+		const handleFullscreenChange = () => updateButtonState()
+
+		for (const eventName of FULLSCREEN_CHANGE_EVENTS) {
+			doc.addEventListener(eventName, handleFullscreenChange)
+		}
+
+		updateButtonState()
+
+		return () => {
+			for (const eventName of FULLSCREEN_CHANGE_EVENTS) {
+				doc.removeEventListener(eventName, handleFullscreenChange)
+			}
+			if (button) {
+				button.removeEventListener('click', handleToggle)
+			}
+			control.remove()
+			mapContainer.classList.remove('leaflet-container--fullscreen')
+		}
+	}, [map])
+
+	return null
+}
 
 type PasswordGateProps = {
 	onSuccess: () => void
@@ -1043,6 +1211,7 @@ export function MapView() {
 					className='h-[60vh] min-h-[360px] w-full md:min-h-[480px] lg:min-h-[560px]'
 					scrollWheelZoom
 				>
+					<FullscreenControl />
 					<TileLayer attribution={tileLayerAttribution} url={tileLayerUrl} />
 					<MapClickHandler onClick={handleMapClick} />
 					{markers}
