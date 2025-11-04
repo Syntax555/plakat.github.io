@@ -70,6 +70,7 @@ const createInitialFormState = (): FormState => ({
 
 const supabase = getSupabaseClient()
 const SUPABASE_TABLE = 'Pins'
+const PIN_FETCH_LIMIT = 500
 
 const defaultCenter: [number, number] = [48.392578, 10.011085]
 const tileLayerUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
@@ -643,6 +644,17 @@ function normalizePins(data: unknown): Pin[] {
 
 	const normalized: Pin[] = []
 
+	const parseCoordinate = (value: unknown): number | null => {
+		if (typeof value === 'number') {
+			return Number.isFinite(value) ? value : null
+		}
+		if (typeof value === 'string' && value.trim() !== '') {
+			const parsed = Number(value)
+			return Number.isFinite(parsed) ? parsed : null
+		}
+		return null
+	}
+
 	for (const item of data) {
 		if (!item || typeof item !== 'object') {
 			continue
@@ -658,8 +670,8 @@ function normalizePins(data: unknown): Pin[] {
 
 		const id = typeof candidate.id === 'string' ? candidate.id : null
 		const title = typeof candidate.title === 'string' ? candidate.title : null
-		const latitude = Number(candidate.latitude)
-		const longitude = Number(candidate.longitude)
+		const latitude = parseCoordinate(candidate.latitude)
+		const longitude = parseCoordinate(candidate.longitude)
 		const createdAtRaw =
 			typeof candidate.createdAt === 'string'
 				? candidate.createdAt
@@ -684,8 +696,8 @@ function normalizePins(data: unknown): Pin[] {
 		if (
 			!id ||
 			!title ||
-			!Number.isFinite(latitude) ||
-			!Number.isFinite(longitude) ||
+			latitude === null ||
+			longitude === null ||
 			!createdAt ||
 			!expiresAt
 		) {
@@ -847,6 +859,7 @@ export function MapView() {
 				.from(SUPABASE_TABLE)
 				.select('*')
 				.order('created_at', { ascending: false })
+				.limit(PIN_FETCH_LIMIT)
 
 			if (!isMounted) {
 				return
@@ -898,7 +911,22 @@ export function MapView() {
 						const filtered = previousPins.filter(
 							pin => pin.id !== updatedPin.id,
 						)
-						return sortPins([updatedPin, ...filtered])
+						const nextPins = [...filtered]
+						const updatedCreatedAt = new Date(
+							updatedPin.createdAt,
+						).getTime()
+						const insertIndex = nextPins.findIndex(existingPin => {
+							const existingCreatedAt = new Date(
+								existingPin.createdAt,
+							).getTime()
+							return existingCreatedAt <= updatedCreatedAt
+						})
+						if (insertIndex === -1) {
+							nextPins.push(updatedPin)
+						} else {
+							nextPins.splice(insertIndex, 0, updatedPin)
+						}
+						return nextPins
 					})
 				},
 			)
