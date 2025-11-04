@@ -1232,7 +1232,7 @@ export function MapView() {
 											value={formState.title}
 											onChange={handleTitleChange}
 											required
-											placeholder='Zum Beispiel: Plakat Laternenmast'
+											placeholder='Zum Beispiel: Plakat Kürbisschnitzen'
 											className={inputClassName}
 										/>
 									</div>
