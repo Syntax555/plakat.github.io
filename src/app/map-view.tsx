@@ -198,7 +198,7 @@ const FullscreenControl = () => {
 			return
 		}
 
-		const control = L.control({ position: 'topright' })
+		const control = new L.Control({ position: 'topright' })
 		let button: HTMLButtonElement | null = null
 
 		const updateButtonState = () => {
