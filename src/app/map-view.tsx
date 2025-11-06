@@ -456,41 +456,39 @@ const submitButtonClass = [
 ].join(' ')
 
 const legendContainerClass = [
-	'mt-3',
 	'flex',
-	'flex-col',
-	'gap-2',
+	'flex-wrap',
+	'items-center',
+	'gap-2.5',
 	'cursor-default',
-	'md:flex-row',
-	'md:items-center',
-	'md:gap-3',
-].join(' ')
-
-const legendLabelClass = [
-	'text-sm',
-	'font-semibold',
-	'text-zinc-800',
 ].join(' ')
 
 const legendListClass = [
 	'flex',
-	'flex-col',
-	'gap-2',
-	'md:flex-row',
-	'md:gap-3',
+	'flex-wrap',
+	'items-center',
+	'gap-2.5',
 ].join(' ')
 
 const legendItemClass = [
 	'flex',
 	'items-center',
-	'gap-2',
-	'text-sm',
+	'gap-1.5',
+	'rounded-full',
+	'border',
+	'border-zinc-200',
+	'bg-white',
+	'px-2.5',
+	'py-1.5',
+	'text-xs',
+	'font-medium',
 	'text-zinc-600',
+	'shadow-sm',
 ].join(' ')
 
 const legendDotBaseClass = [
-	'h-3',
-	'w-3',
+	'h-2.5',
+	'w-2.5',
 	'rounded-full',
 	'border',
 	'border-white',
@@ -731,20 +729,19 @@ type MapLegendProps = {
 function MapLegend({ hangingCount, expiredCount }: MapLegendProps) {
 	return (
 		<div className={legendContainerClass}>
-			<p className={legendLabelClass}>Legende:</p>
 			<div className={legendListClass}>
 				<div className={legendItemClass}>
 					<span className={legendDotDefaultClass} />
-					<span>Blau: Hängendes Plakat</span>
+					<span>Aktiv (blau)</span>
 					<span className={legendCountBadgeClass}>{hangingCount}</span>
 				</div>
 				<div className={legendItemClass}>
 					<span className={legendDotPendingClass} />
-					<span>Orange: Neuer Pin (noch nicht gespeichert)</span>
+					<span>Entwurf (orange)</span>
 				</div>
 				<div className={legendItemClass}>
 					<span className={legendDotExpiredClass} />
-					<span>Rot: Abbau überfällig (bitte prüfen)</span>
+					<span>Überfällig (rot)</span>
 					<span className={legendCountBadgeClass}>{expiredCount}</span>
 				</div>
 			</div>
@@ -1620,15 +1617,6 @@ export function MapView() {
 					id='map-info-panel'
 					className={`${infoPanelBodyBaseClass} ${isInfoOpen ? 'block' : 'hidden'}`}
 				>
-					<p className='text-sm text-zinc-600'>
-						Tippe oder klicke auf die Karte, um einen neuen Standort für ein
-						Plakat zu setzen. Jeder Pin ist für alle sichtbar und kann mit einem
-						Titel sowie einer optionalen Beschreibung versehen werden.
-					</p>
-					<p className='text-sm text-zinc-600'>
-						Bitte hinterlege auch einen Abbau-Termin, damit fällige Plakate
-						schnell erkannt und entfernt werden können.
-					</p>
 					<MapLegend
 						hangingCount={pinStatusCounts.hanging}
 						expiredCount={pinStatusCounts.expired}
