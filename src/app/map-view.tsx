@@ -4,6 +4,7 @@ import {
 	useCallback,
 	useEffect,
 	useMemo,
+	useRef,
 	useState,
 	type ChangeEvent,
 	type FormEvent,
@@ -35,6 +36,25 @@ type FormState = {
 	description: string
 	expiresAt: string
 }
+
+type SearchResult = {
+	placeId: string
+	displayName: string
+	latitude: number
+	longitude: number
+}
+
+type NominatimResponseItem = {
+	place_id: string
+	display_name: string
+	lat: string
+	lon: string
+}
+
+const NOMINATIM_BASE_URL =
+	process.env.NEXT_PUBLIC_NOMINATIM_URL ?? 'https://nominatim.openstreetmap.org'
+const NOMINATIM_EMAIL = process.env.NEXT_PUBLIC_NOMINATIM_EMAIL ?? ''
+const NOMINATIM_SEARCH_LIMIT = 5
 
 const ACCESS_HASH = process.env.NEXT_PUBLIC_ACCESS_HASH ?? ''
 const ACCESS_STORAGE_KEY = 'plakat-access-hash'
@@ -521,6 +541,97 @@ const infoPanelBodyBaseClass = [
 	'py-4',
 ].join(' ')
 
+const searchSectionClass = [
+	'space-y-3',
+	'border-t',
+	'border-zinc-200',
+	'bg-zinc-50/80',
+	'px-4',
+	'py-4',
+].join(' ')
+
+const searchFormClass = ['space-y-2'].join(' ')
+
+const searchControlsClass = [
+	'flex',
+	'flex-col',
+	'gap-2',
+	'sm:flex-row',
+].join(' ')
+
+const searchButtonClass = [
+	'inline-flex',
+	'items-center',
+	'justify-center',
+	'rounded',
+	'bg-blue-600',
+	'px-3.5',
+	'py-2.5',
+	'text-sm',
+	'font-semibold',
+	'text-white',
+	'transition',
+	'duration-150',
+	'hover:bg-blue-700',
+	'disabled:cursor-not-allowed',
+	'disabled:bg-blue-400',
+].join(' ')
+
+const searchResultsListClass = [
+	'space-y-2',
+	'rounded-lg',
+	'border',
+	'border-zinc-200',
+	'bg-white',
+	'p-3',
+	'shadow-sm',
+].join(' ')
+
+const searchResultButtonClass = [
+	'w-full',
+	'rounded',
+	'px-3',
+	'py-2',
+	'text-left',
+	'text-sm',
+	'text-zinc-700',
+	'transition',
+	'duration-150',
+	'hover:bg-blue-50',
+	'focus-visible:outline-none',
+	'focus-visible:ring-2',
+	'focus-visible:ring-blue-400/70',
+].join(' ')
+
+const filterControlsClass = [
+	'flex',
+	'flex-wrap',
+	'gap-2',
+	'pt-2',
+].join(' ')
+
+const filterButtonBaseClass = [
+	'inline-flex',
+	'items-center',
+	'gap-2',
+	'rounded-full',
+	'border',
+	'border-zinc-200',
+	'px-3',
+	'py-1.5',
+	'text-xs',
+	'font-semibold',
+	'uppercase',
+	'tracking-wide',
+	'transition',
+	'duration-150',
+	'hover:border-blue-300',
+	'hover:text-blue-700',
+	'focus-visible:outline-none',
+	'focus-visible:ring-2',
+	'focus-visible:ring-blue-400/70',
+].join(' ')
+
 const tileLayerAttribution = [
 	'&copy; <a href="https://www.openstreetmap.org/copyright">',
 	'OpenStreetMap</a> Mitwirkende',
@@ -795,6 +906,18 @@ export function MapView() {
 	const [isSubmitting, setIsSubmitting] = useState(false)
 	const [deletingId, setDeletingId] = useState<string | null>(null)
 	const [isInfoOpen, setIsInfoOpen] = useState(true)
+	const [statusFilter, setStatusFilter] = useState<'all' | 'hanging' | 'expired'>(
+		'all',
+	)
+	const [searchQuery, setSearchQuery] = useState('')
+	const [searchResults, setSearchResults] = useState<SearchResult[]>([])
+	const [isSearching, setIsSearching] = useState(false)
+	const [searchError, setSearchError] = useState<string | null>(null)
+	const searchAbortController = useRef<AbortController | null>(null)
+	const [mapInstance, setMapInstance] = useState<L.Map | null>(null)
+	const pendingFocusRef = useRef<{ coords: [number, number]; zoom: number } | null>(
+		null,
+	)
 	const supabaseClient = supabase
 
 	useEffect(() => {
@@ -822,6 +945,25 @@ export function MapView() {
 			console.warn('Failed to persist info panel state', storageError)
 		}
 	}, [isInfoOpen])
+
+	useEffect(() => {
+		return () => {
+			if (searchAbortController.current) {
+				searchAbortController.current.abort()
+			}
+		}
+	}, [])
+
+	useEffect(() => {
+		if (!mapInstance && !pendingFocusRef.current) {
+			return
+		}
+		if (mapInstance && pendingFocusRef.current) {
+			const { coords, zoom } = pendingFocusRef.current
+			pendingFocusRef.current = null
+			mapInstance.flyTo(coords, zoom, { animate: true })
+		}
+	}, [mapInstance])
 
 	useEffect(() => {
 		if (!ACCESS_HASH) {
@@ -946,6 +1088,126 @@ export function MapView() {
 	const toggleInfoPanel = useCallback(() => {
 		setIsInfoOpen(previous => !previous)
 	}, [])
+
+	const handleStatusFilterChange = useCallback(
+		(nextFilter: 'all' | 'hanging' | 'expired') => {
+			setStatusFilter(previous =>
+				previous === nextFilter ? previous : nextFilter,
+			)
+		},
+		[],
+	)
+
+	const handleSearchQueryChange = useCallback(
+		(event: ChangeEvent<HTMLInputElement>) => {
+			const { value } = event.target
+			setSearchQuery(value)
+			if (searchError) {
+				setSearchError(null)
+			}
+		},
+		[searchError],
+	)
+
+	const handleSearchSubmit = useCallback(
+		async (event: FormEvent<HTMLFormElement>) => {
+			event.preventDefault()
+			const trimmedQuery = searchQuery.trim()
+			if (!trimmedQuery) {
+				setSearchResults([])
+				setSearchError('Bitte gib einen Suchbegriff ein.')
+				return
+			}
+
+			if (searchAbortController.current) {
+				searchAbortController.current.abort()
+			}
+
+			const controller = new AbortController()
+			searchAbortController.current = controller
+			setIsSearching(true)
+			setSearchError(null)
+
+			try {
+				const params = new URLSearchParams({
+					q: trimmedQuery,
+					format: 'jsonv2',
+					addressdetails: '1',
+					limit: NOMINATIM_SEARCH_LIMIT.toString(),
+				})
+				if (NOMINATIM_EMAIL) {
+					params.set('email', NOMINATIM_EMAIL)
+				}
+
+				const response = await fetch(
+					`${NOMINATIM_BASE_URL}/search?${params.toString()}`,
+					{
+						signal: controller.signal,
+						headers: { 'Accept-Language': 'de' },
+					},
+				)
+
+				if (!response.ok) {
+					throw new Error(
+						`Adresssuche fehlgeschlagen (Status ${response.status}).`,
+					)
+				}
+
+				const payload = (await response.json()) as NominatimResponseItem[]
+				const mapped = payload.reduce<SearchResult[]>((accumulator, item) => {
+					const latitude = Number.parseFloat(item.lat)
+					const longitude = Number.parseFloat(item.lon)
+					if (Number.isNaN(latitude) || Number.isNaN(longitude)) {
+						return accumulator
+					}
+					accumulator.push({
+						placeId: String(item.place_id),
+						displayName: item.display_name,
+						latitude,
+						longitude,
+					})
+					return accumulator
+				}, [])
+
+				setSearchResults(mapped)
+				if (!mapped.length) {
+					setSearchError('Keine Treffer gefunden.')
+				}
+			} catch (searchRequestError) {
+				if (
+					searchRequestError instanceof DOMException &&
+					searchRequestError.name === 'AbortError'
+				) {
+					return
+				}
+				console.error('Adresssuche fehlgeschlagen', searchRequestError)
+				setSearchError('Die Adresse konnte nicht gesucht werden.')
+			} finally {
+				setIsSearching(false)
+				if (searchAbortController.current === controller) {
+					searchAbortController.current = null
+				}
+			}
+		},
+		[searchQuery],
+	)
+
+	const handleSearchResultSelect = useCallback(
+		(result: SearchResult) => {
+			const coords: [number, number] = [result.latitude, result.longitude]
+			const targetZoom = Math.max(mapInstance?.getZoom() ?? 0, 16)
+			setSearchQuery(result.displayName)
+			setSearchResults([])
+			setSearchError(null)
+
+			if (mapInstance) {
+				mapInstance.flyTo(coords, targetZoom, { animate: true })
+			} else {
+				pendingFocusRef.current = { coords, zoom: targetZoom }
+			}
+		},
+		[mapInstance],
+	)
 
 	const submitNewPin = useCallback(
 		async (event: FormEvent<HTMLFormElement>) => {
@@ -1113,9 +1375,37 @@ export function MapView() {
 		setFormState(createInitialFormState())
 	}, [])
 
-	const pinStatusCounts = useMemo(
+	const overallPinCounts = useMemo(
 		() =>
 			pins.reduce(
+				(accumulator, pin) => {
+					accumulator.total += 1
+					if (isPinExpired(pin.expiresAt)) {
+						accumulator.expired += 1
+					} else {
+						accumulator.hanging += 1
+					}
+					return accumulator
+				},
+				{ total: 0, hanging: 0, expired: 0 },
+			),
+		[pins],
+	)
+
+	const visiblePins = useMemo(() => {
+		if (statusFilter === 'all') {
+			return pins
+		}
+
+		return pins.filter(pin => {
+			const expired = isPinExpired(pin.expiresAt)
+			return statusFilter === 'expired' ? expired : !expired
+		})
+	}, [pins, statusFilter])
+
+	const pinStatusCounts = useMemo(
+		() =>
+			visiblePins.reduce(
 				(accumulator, pin) => {
 					if (isPinExpired(pin.expiresAt)) {
 						accumulator.expired += 1
@@ -1126,12 +1416,12 @@ export function MapView() {
 				},
 				{ hanging: 0, expired: 0 },
 			),
-		[pins],
+		[visiblePins],
 	)
 
 	const markers = useMemo(
 		() =>
-			pins.map(pin => {
+			visiblePins.map(pin => {
 				const expired = isPinExpired(pin.expiresAt)
 				const markerIcon = expired ? expiredIcon : defaultIcon
 
@@ -1152,8 +1442,16 @@ export function MapView() {
 					</Marker>
 				)
 			}),
-		[deletingId, handleDelete, pins],
+		[deletingId, handleDelete, visiblePins],
 	)
+
+	const getFilterButtonClass = (filter: 'all' | 'hanging' | 'expired') =>
+		[
+			filterButtonBaseClass,
+			statusFilter === filter
+				? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
+				: 'bg-white text-zinc-600',
+		].join(' ')
 
 	if (!isAuthReady) {
 		return null
@@ -1203,6 +1501,104 @@ export function MapView() {
 						/>
 					</svg>
 				</button>
+				<div className={searchSectionClass}>
+					<form className={searchFormClass} onSubmit={handleSearchSubmit}>
+						<div className='space-y-1'>
+							<label
+								className='text-xs font-semibold uppercase tracking-wide text-zinc-500'
+								htmlFor='map-search-input'
+							>
+								Adresse oder Ort suchen
+							</label>
+							<div className={searchControlsClass}>
+								<input
+									id='map-search-input'
+									type='search'
+									autoComplete='off'
+									inputMode='search'
+									value={searchQuery}
+									onChange={handleSearchQueryChange}
+									placeholder='z. B. Augsburger Straße 15, Neu-Ulm'
+									className={`${inputClassName} sm:flex-1`}
+									aria-describedby='map-search-hint'
+								/>
+								<button
+									type='submit'
+									className={searchButtonClass}
+									disabled={isSearching}
+								>
+									{isSearching ? 'Suche läuft…' : 'Suchen'}
+								</button>
+							</div>
+							<p
+								id='map-search-hint'
+								className='text-[11px] uppercase tracking-wide text-zinc-400'
+							>
+								Ergebnisse über OpenStreetMap
+							</p>
+						</div>
+					</form>
+					{searchError ? (
+						<p className='text-sm text-red-600'>{searchError}</p>
+					) : null}
+					{searchResults.length ? (
+						<ul className={searchResultsListClass}>
+							{searchResults.map(result => (
+								<li key={result.placeId}>
+									<button
+										type='button'
+										className={searchResultButtonClass}
+										onClick={() => handleSearchResultSelect(result)}
+									>
+										{result.displayName}
+									</button>
+								</li>
+							))}
+						</ul>
+					) : null}
+					{overallPinCounts.total > 0 ? (
+						<div className='space-y-2'>
+							<p className='text-xs font-semibold uppercase tracking-wide text-zinc-500'>
+								Pins filtern
+							</p>
+							<div className={filterControlsClass}>
+								<button
+									type='button'
+									onClick={() => handleStatusFilterChange('all')}
+									className={getFilterButtonClass('all')}
+									aria-pressed={statusFilter === 'all'}
+								>
+									<span>Alle</span>
+									<span className={legendCountBadgeClass}>
+										{overallPinCounts.total}
+									</span>
+								</button>
+								<button
+									type='button'
+									onClick={() => handleStatusFilterChange('hanging')}
+									className={getFilterButtonClass('hanging')}
+									aria-pressed={statusFilter === 'hanging'}
+								>
+									<span>Aktiv</span>
+									<span className={legendCountBadgeClass}>
+										{overallPinCounts.hanging}
+									</span>
+								</button>
+								<button
+									type='button'
+									onClick={() => handleStatusFilterChange('expired')}
+									className={getFilterButtonClass('expired')}
+									aria-pressed={statusFilter === 'expired'}
+								>
+									<span>Überfällig</span>
+									<span className={legendCountBadgeClass}>
+										{overallPinCounts.expired}
+									</span>
+								</button>
+							</div>
+						</div>
+					) : null}
+				</div>
 				<div
 					id='map-info-panel'
 					className={`${infoPanelBodyBaseClass} ${isInfoOpen ? 'block' : 'hidden'}`}
@@ -1237,6 +1633,7 @@ export function MapView() {
 					center={defaultCenter}
 					zoom={15}
 					className='h-[60vh] min-h-[360px] w-full md:min-h-[480px] lg:min-h-[560px]'
+					whenCreated={setMapInstance}
 					scrollWheelZoom
 				>
 					<FullscreenControl />
