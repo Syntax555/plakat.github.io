@@ -295,6 +295,23 @@ const FullscreenControl = () => {
 	return null
 }
 
+type MapInstanceBridgeProps = {
+	onReady: (map: L.Map | null) => void
+}
+
+const MapInstanceBridge = ({ onReady }: MapInstanceBridgeProps) => {
+	const map = useMap()
+
+	useEffect(() => {
+		onReady(map)
+		return () => {
+			onReady(null)
+		}
+	}, [map, onReady])
+
+	return null
+}
+
 type PasswordGateProps = {
 	onSuccess: () => void
 }
@@ -1633,9 +1650,9 @@ export function MapView() {
 					center={defaultCenter}
 					zoom={15}
 					className='h-[60vh] min-h-[360px] w-full md:min-h-[480px] lg:min-h-[560px]'
-					whenCreated={setMapInstance}
 					scrollWheelZoom
 				>
+					<MapInstanceBridge onReady={setMapInstance} />
 					<FullscreenControl />
 					<TileLayer attribution={tileLayerAttribution} url={tileLayerUrl} />
 					<MapClickHandler onClick={handleMapClick} />
