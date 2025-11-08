@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import {
 	useCallback,
@@ -91,6 +91,7 @@ const createInitialFormState = (): FormState => ({
 const supabase = getSupabaseClient()
 const SUPABASE_TABLE = 'Pins'
 const PIN_FETCH_LIMIT = 500
+const PIN_FETCH_PAGE_SIZE = 120
 
 const defaultCenter: [number, number] = [48.392578, 10.011085]
 const tileLayerUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
@@ -512,6 +513,23 @@ const legendCountBadgeClass = [
 	'leading-none',
 ].join(' ')
 
+const skeletonWrapperClass = [
+	'border-t',
+	'border-zinc-200',
+	'bg-zinc-50',
+	'px-4',
+	'py-4',
+	'space-y-2',
+	'animate-pulse',
+].join(' ')
+
+const skeletonBarClass = [
+	'h-3',
+	'rounded-full',
+	'bg-zinc-200',
+].join(' ')
+
+
 const infoPanelCardClass = [
 	'overflow-hidden',
 	'rounded-lg',
@@ -929,6 +947,9 @@ export function MapView() {
 	const [searchError, setSearchError] = useState<string | null>(null)
 	const searchAbortController = useRef<AbortController | null>(null)
 	const [mapInstance, setMapInstance] = useState<L.Map | null>(null)
+	const [hasMorePins, setHasMorePins] = useState(false)
+	const [nextRangeStart, setNextRangeStart] = useState(0)
+	const [isLoadingMore, setIsLoadingMore] = useState(false)
 	const pendingFocusRef = useRef<{ coords: [number, number]; zoom: number } | null>(
 		null,
 	)
@@ -995,15 +1016,12 @@ export function MapView() {
 	}, [])
 
 	useEffect(() => {
-		if (!isAuthenticated) {
-			return
-		}
-
 		if (!supabaseClient) {
 			setError(
-				'Supabase ist nicht konfiguriert. Bitte Umgebungsvariablen prüfen.',
+				'Supabase ist nicht konfiguriert. Bitte Umgebungsvariablen pruefen.',
 			)
 			setIsLoading(false)
+			setHasMorePins(false)
 			return
 		}
 
@@ -1011,11 +1029,13 @@ export function MapView() {
 
 		const loadPins = async () => {
 			setIsLoading(true)
-			const { data, error: loadError } = await supabaseClient
+			const rangeEnd = Math.min(PIN_FETCH_PAGE_SIZE, PIN_FETCH_LIMIT) - 1
+			const baseQuery = supabaseClient
 				.from(SUPABASE_TABLE)
 				.select('*')
 				.order('created_at', { ascending: false })
-				.limit(PIN_FETCH_LIMIT)
+			const { data, error: loadError } =
+				rangeEnd >= 0 ? await baseQuery.range(0, rangeEnd) : await baseQuery
 
 			if (!isMounted) {
 				return
@@ -1024,9 +1044,18 @@ export function MapView() {
 			if (loadError) {
 				console.error('Failed to load pins from Supabase', loadError)
 				setError('Die Pins konnten nicht geladen werden.')
+				setPins([])
+				setHasMorePins(false)
+				setNextRangeStart(0)
 			} else {
-				setPins(normalizePins(data ?? []))
+				const normalized = normalizePins(data ?? [])
+				setPins(normalized)
 				setError(null)
+				const fetchedCount = normalized.length
+				setNextRangeStart(fetchedCount)
+				const limitReached = fetchedCount >= PIN_FETCH_LIMIT
+				const expectedChunk = Math.min(PIN_FETCH_PAGE_SIZE, PIN_FETCH_LIMIT)
+				setHasMorePins(!limitReached && fetchedCount === expectedChunk)
 			}
 
 			setIsLoading(false)
@@ -1102,6 +1131,86 @@ export function MapView() {
 	const toggleInfoPanel = useCallback(() => {
 		setIsInfoOpen(previous => !previous)
 	}, [])
+
+	const loadMorePins = useCallback(async () => {
+		if (!supabaseClient || isLoadingMore || !hasMorePins) {
+			return
+		}
+
+		if (nextRangeStart >= PIN_FETCH_LIMIT) {
+			setHasMorePins(false)
+			return
+		}
+
+		const rangeStart = nextRangeStart
+		const rangeEnd = Math.min(PIN_FETCH_LIMIT, rangeStart + PIN_FETCH_PAGE_SIZE) - 1
+		if (rangeEnd < rangeStart) {
+			setHasMorePins(false)
+			return
+		}
+
+		setIsLoadingMore(true)
+
+		try {
+			const { data, error: loadError } = await supabaseClient
+				.from(SUPABASE_TABLE)
+				.select('*')
+				.order('created_at', { ascending: false })
+				.range(rangeStart, rangeEnd)
+
+			if (loadError) {
+				console.error('Failed to load additional pins', loadError)
+				setError('Weitere Pins konnten nicht geladen werden.')
+				setHasMorePins(false)
+				return
+			}
+
+			const normalized = normalizePins(data ?? [])
+			if (normalized.length) {
+				setPins(previous => {
+					const existingIds = new Set(previous.map(pin => pin.id))
+					const deduped = normalized.filter(pin => !existingIds.has(pin.id))
+					return sortPins([...previous, ...deduped])
+				})
+			}
+
+			const fetchedCount = normalized.length
+			const nextStart = rangeStart + fetchedCount
+			setNextRangeStart(nextStart)
+			const limitReached = nextStart >= PIN_FETCH_LIMIT
+			const requested = rangeEnd - rangeStart + 1
+			setHasMorePins(!limitReached && fetchedCount === requested)
+		} catch (loadMoreUnexpected) {
+			console.error('Unexpected pagination error', loadMoreUnexpected)
+			setError('Weitere Pins konnten nicht geladen werden.')
+			setHasMorePins(false)
+		} finally {
+			setIsLoadingMore(false)
+		}
+	}, [
+		hasMorePins,
+		isLoadingMore,
+		nextRangeStart,
+		setPins,
+		supabaseClient,
+	])
+
+	useEffect(() => {
+		if (!hasMorePins || isLoading || isLoadingMore) {
+			return
+		}
+		if (!pins.length || pins.length % PIN_FETCH_PAGE_SIZE !== 0) {
+			return
+		}
+
+		const idleTimer = window.setTimeout(() => {
+			void loadMorePins()
+		}, 1000)
+
+		return () => {
+			window.clearTimeout(idleTimer)
+		}
+	}, [hasMorePins, isLoading, isLoadingMore, loadMorePins, pins.length])
 
 	const handleStatusFilterChange = useCallback(
 		(nextFilter: 'all' | 'hanging' | 'expired') => {
@@ -1532,7 +1641,7 @@ export function MapView() {
 									inputMode='search'
 									value={searchQuery}
 									onChange={handleSearchQueryChange}
-									placeholder='z. B. Augsburger Straße 15, Neu-Ulm'
+									placeholder='z. B. Augsburger Straße 15, Neu-Ulm'
 									className={`${inputClassName} sm:flex-1`}
 									aria-describedby='map-search-hint'
 								/>
@@ -1628,8 +1737,10 @@ export function MapView() {
 					</div>
 				) : null}
 				{isLoading ? (
-					<div className='border-t border-zinc-200 px-4 py-3'>
-						<p className='text-sm text-zinc-500'>Pins werden geladen...</p>
+					<div className={skeletonWrapperClass}>
+						<div className={skeletonBarClass} />
+						<div className={`${skeletonBarClass} w-4/5`} />
+						<div className={`${skeletonBarClass} w-2/3`} />
 					</div>
 				) : null}
 			</div>
@@ -1727,3 +1838,4 @@ export function MapView() {
 		</div>
 	)
 }
+
