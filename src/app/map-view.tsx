@@ -91,6 +91,7 @@ const createInitialFormState = (): FormState => ({
 const supabase = getSupabaseClient()
 const SUPABASE_TABLE = 'Pins'
 const PIN_FETCH_LIMIT = 500
+const WRITE_COOLDOWN_MS = 5_000
 const PIN_FETCH_PAGE_SIZE = 120
 
 const defaultCenter: [number, number] = [48.392578, 10.011085]
@@ -947,13 +948,30 @@ export function MapView() {
 	const [searchError, setSearchError] = useState<string | null>(null)
 	const searchAbortController = useRef<AbortController | null>(null)
 	const [mapInstance, setMapInstance] = useState<L.Map | null>(null)
-	const [hasMorePins, setHasMorePins] = useState(false)
-	const [nextRangeStart, setNextRangeStart] = useState(0)
-	const [isLoadingMore, setIsLoadingMore] = useState(false)
-	const pendingFocusRef = useRef<{ coords: [number, number]; zoom: number } | null>(
-		null,
+const [hasMorePins, setHasMorePins] = useState(false)
+const [nextRangeStart, setNextRangeStart] = useState(0)
+const [isLoadingMore, setIsLoadingMore] = useState(false)
+const lastWriteAtRef = useRef<number | null>(null)
+const pendingFocusRef = useRef<{ coords: [number, number]; zoom: number } | null>(
+	null,
+)
+const supabaseClient = supabase
+
+	const enforceWriteRateLimit = useCallback(
+		(message: string) => {
+			const now = Date.now()
+			if (
+				lastWriteAtRef.current !== null &&
+				now - lastWriteAtRef.current < WRITE_COOLDOWN_MS
+			) {
+				setError(message)
+				return false
+			}
+			lastWriteAtRef.current = now
+			return true
+		},
+		[],
 	)
-	const supabaseClient = supabase
 
 	useEffect(() => {
 		if (typeof window === 'undefined') {
@@ -1359,6 +1377,14 @@ export function MapView() {
 				return
 			}
 
+			if (
+				!enforceWriteRateLimit(
+					'Bitte warte kurz, bevor du einen weiteren Pin speicherst.',
+				)
+			) {
+				return
+			}
+
 			setIsSubmitting(true)
 
 			if (!supabaseClient) {
@@ -1411,6 +1437,7 @@ export function MapView() {
 			formState.expiresAt,
 			formState.title,
 			newPinLocation,
+			enforceWriteRateLimit,
 			supabaseClient,
 		],
 	)
@@ -1426,6 +1453,14 @@ export function MapView() {
 			)
 
 			if (!confirmed) {
+				return
+			}
+
+			if (
+				!enforceWriteRateLimit(
+					'Bitte warte kurz, bevor du einen weiteren Pin loeschst.',
+				)
+			) {
 				return
 			}
 
@@ -1457,7 +1492,7 @@ export function MapView() {
 				setDeletingId(null)
 			}
 		},
-		[supabaseClient],
+		[enforceWriteRateLimit, supabaseClient],
 	)
 
 	const handleTitleChange = useCallback(
