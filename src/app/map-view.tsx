@@ -37,6 +37,12 @@ type FormState = {
 	expiresAt: string
 }
 
+const FORM_FIELD_NAMES = ['title', 'description', 'expiresAt'] as const
+type FormFieldName = (typeof FORM_FIELD_NAMES)[number]
+
+const isFormFieldName = (value: string): value is FormFieldName =>
+	FORM_FIELD_NAMES.includes(value as FormFieldName)
+
 type SearchResult = {
 	placeId: string
 	displayName: string
@@ -1509,34 +1515,16 @@ const supabaseClient = supabase
 		[enforceWriteRateLimit, supabaseClient],
 	)
 
-	const handleTitleChange = useCallback(
-		(event: ChangeEvent<HTMLInputElement>) => {
-			const { value } = event.target
-			setFormState(previous => ({
-				...previous,
-				title: value,
-			}))
-		},
-		[setFormState],
-	)
+	const handleFormFieldChange = useCallback(
+		(event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+			const { name, value } = event.target
+			if (!isFormFieldName(name)) {
+				return
+			}
 
-	const handleDescriptionChange = useCallback(
-		(event: ChangeEvent<HTMLTextAreaElement>) => {
-			const { value } = event.target
 			setFormState(previous => ({
 				...previous,
-				description: value,
-			}))
-		},
-		[setFormState],
-	)
-
-	const handleExpiresAtChange = useCallback(
-		(event: ChangeEvent<HTMLInputElement>) => {
-			const { value } = event.target
-			setFormState(previous => ({
-				...previous,
-				expiresAt: value,
+				[name]: value,
 			}))
 		},
 		[setFormState],
@@ -1800,9 +1788,10 @@ const supabaseClient = supabase
 										</label>
 										<input
 											id='pin-title'
+											name='title'
 											type='text'
 											value={formState.title}
-											onChange={handleTitleChange}
+											onChange={handleFormFieldChange}
 											required
 											placeholder='Zum Beispiel: Plakat Kürbisschnitzen'
 											className={inputClassName}
@@ -1817,8 +1806,9 @@ const supabaseClient = supabase
 										</label>
 										<textarea
 											id='pin-description'
+											name='description'
 											value={formState.description}
-											onChange={handleDescriptionChange}
+											onChange={handleFormFieldChange}
 											rows={3}
 											placeholder={descriptionPlaceholder}
 											className={textAreaClassName}
@@ -1833,9 +1823,10 @@ const supabaseClient = supabase
 										</label>
 										<input
 											id='pin-expires-at'
+											name='expiresAt'
 											type='date'
 											value={formState.expiresAt}
-											onChange={handleExpiresAtChange}
+											onChange={handleFormFieldChange}
 											required
 											className={inputClassName}
 										/>
