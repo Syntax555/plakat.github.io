@@ -87,6 +87,9 @@ const STATUS_FILTERS: StatusFilterOption[] = [
 	},
 ]
 
+const cn = (...classNames: Array<string | false | null | undefined>) =>
+	classNames.filter(Boolean).join(' ')
+
 const NOMINATIM_BASE_URL =
 	process.env.NEXT_PUBLIC_NOMINATIM_URL ?? 'https://nominatim.openstreetmap.org'
 const NOMINATIM_EMAIL = process.env.NEXT_PUBLIC_NOMINATIM_EMAIL ?? ''
@@ -443,7 +446,7 @@ const PasswordGate = ({ onSuccess }: PasswordGateProps) => {
 	)
 }
 
-const deleteButtonClass = [
+const deleteButtonClass = cn(
 	'w-full',
 	'rounded',
 	'bg-red-600',
@@ -458,9 +461,9 @@ const deleteButtonClass = [
 	'focus-visible:outline-offset-2',
 	'focus-visible:outline-red-700',
 	'cursor-pointer',
-].join(' ')
+)
 
-const cancelButtonClass = [
+const cancelButtonClass = cn(
 	'rounded',
 	'border',
 	'border-zinc-300',
@@ -475,9 +478,9 @@ const cancelButtonClass = [
 	'focus-visible:outline-offset-2',
 	'focus-visible:outline-zinc-400',
 	'cursor-pointer',
-].join(' ')
+)
 
-const submitButtonClass = [
+const submitButtonClass = cn(
 	'rounded',
 	'bg-blue-600',
 	'px-3',
@@ -491,24 +494,19 @@ const submitButtonClass = [
 	'focus-visible:outline-offset-2',
 	'focus-visible:outline-blue-700',
 	'cursor-pointer',
-].join(' ')
+)
 
-const legendContainerClass = [
+const legendContainerClass = cn(
 	'flex',
 	'flex-wrap',
 	'items-center',
 	'gap-2.5',
 	'cursor-default',
-].join(' ')
+)
 
-const legendListClass = [
-	'flex',
-	'flex-wrap',
-	'items-center',
-	'gap-2.5',
-].join(' ')
+const legendListClass = cn('flex', 'flex-wrap', 'items-center', 'gap-2.5')
 
-const legendItemClass = [
+const legendItemClass = cn(
 	'flex',
 	'items-center',
 	'gap-1.5',
@@ -522,24 +520,24 @@ const legendItemClass = [
 	'font-medium',
 	'text-zinc-600',
 	'shadow-sm',
-].join(' ')
+)
 
-const legendDotBaseClass = [
+const legendDotBaseClass = cn(
 	'h-2.5',
 	'w-2.5',
 	'rounded-full',
 	'border',
 	'border-white',
 	'shadow-sm',
-].join(' ')
+)
 
-const legendDotDefaultClass = [legendDotBaseClass, 'bg-blue-600'].join(' ')
+const legendDotDefaultClass = cn(legendDotBaseClass, 'bg-blue-600')
 
-const legendDotPendingClass = [legendDotBaseClass, 'bg-orange-500'].join(' ')
+const legendDotPendingClass = cn(legendDotBaseClass, 'bg-orange-500')
 
-const legendDotExpiredClass = [legendDotBaseClass, 'bg-red-600'].join(' ')
+const legendDotExpiredClass = cn(legendDotBaseClass, 'bg-red-600')
 
-const legendCountBadgeClass = [
+const legendCountBadgeClass = cn(
 	'rounded-full',
 	'bg-zinc-100',
 	'px-2',
@@ -548,9 +546,9 @@ const legendCountBadgeClass = [
 	'font-semibold',
 	'text-zinc-700',
 	'leading-none',
-].join(' ')
+)
 
-const skeletonWrapperClass = [
+const skeletonWrapperClass = cn(
 	'border-t',
 	'border-zinc-200',
 	'bg-zinc-50',
@@ -558,23 +556,18 @@ const skeletonWrapperClass = [
 	'py-4',
 	'space-y-2',
 	'animate-pulse',
-].join(' ')
+)
 
-const skeletonBarClass = [
-	'h-3',
-	'rounded-full',
-	'bg-zinc-200',
-].join(' ')
+const skeletonBarClass = cn('h-3', 'rounded-full', 'bg-zinc-200')
 
-
-const infoPanelCardClass = [
+const infoPanelCardClass = cn(
 	'overflow-hidden',
 	'rounded-lg',
 	'bg-white',
 	'shadow-sm',
-].join(' ')
+)
 
-const infoPanelToggleButtonClass = [
+const infoPanelToggleButtonClass = cn(
 	'flex',
 	'w-full',
 	'items-center',
@@ -592,44 +585,39 @@ const infoPanelToggleButtonClass = [
 	'focus-visible:outline-none',
 	'focus-visible:ring-2',
 	'focus-visible:ring-blue-400/70',
-].join(' ')
+)
 
-const infoPanelIconClass = [
+const infoPanelIconClass = cn(
 	'h-5',
 	'w-5',
 	'flex-shrink-0',
 	'text-blue-900',
 	'transition-transform',
 	'duration-200',
-].join(' ')
+)
 
-const infoPanelBodyBaseClass = [
+const infoPanelBodyBaseClass = cn(
 	'space-y-3',
 	'border-t',
 	'border-zinc-200',
 	'px-4',
 	'py-4',
-].join(' ')
+)
 
-const searchSectionClass = [
+const searchSectionClass = cn(
 	'space-y-3',
 	'border-t',
 	'border-zinc-200',
 	'bg-zinc-50/80',
 	'px-4',
 	'py-4',
-].join(' ')
+)
 
-const searchFormClass = ['space-y-2'].join(' ')
+const searchFormClass = cn('space-y-2')
 
-const searchControlsClass = [
-	'flex',
-	'flex-col',
-	'gap-2',
-	'sm:flex-row',
-].join(' ')
+const searchControlsClass = cn('flex', 'flex-col', 'gap-2', 'sm:flex-row')
 
-const searchButtonClass = [
+const searchButtonClass = cn(
 	'inline-flex',
 	'items-center',
 	'justify-center',
@@ -645,9 +633,9 @@ const searchButtonClass = [
 	'hover:bg-blue-700',
 	'disabled:cursor-not-allowed',
 	'disabled:bg-blue-400',
-].join(' ')
+)
 
-const searchResultsListClass = [
+const searchResultsListClass = cn(
 	'space-y-2',
 	'rounded-lg',
 	'border',
@@ -655,9 +643,9 @@ const searchResultsListClass = [
 	'bg-white',
 	'p-3',
 	'shadow-sm',
-].join(' ')
+)
 
-const searchResultButtonClass = [
+const searchResultButtonClass = cn(
 	'w-full',
 	'rounded',
 	'px-3',
@@ -671,16 +659,11 @@ const searchResultButtonClass = [
 	'focus-visible:outline-none',
 	'focus-visible:ring-2',
 	'focus-visible:ring-blue-400/70',
-].join(' ')
+)
 
-const filterControlsClass = [
-	'flex',
-	'flex-wrap',
-	'gap-2',
-	'pt-2',
-].join(' ')
+const filterControlsClass = cn('flex', 'flex-wrap', 'gap-2', 'pt-2')
 
-const filterButtonBaseClass = [
+const filterButtonBaseClass = cn(
 	'inline-flex',
 	'items-center',
 	'gap-2',
@@ -700,7 +683,7 @@ const filterButtonBaseClass = [
 	'focus-visible:outline-none',
 	'focus-visible:ring-2',
 	'focus-visible:ring-blue-400/70',
-].join(' ')
+)
 
 const tileLayerAttribution = [
 	'&copy; <a href="https://www.openstreetmap.org/copyright">',
@@ -1635,12 +1618,12 @@ const supabaseClient = supabase
 	)
 
 	const getFilterButtonClass = (filter: StatusFilter) =>
-		[
+		cn(
 			filterButtonBaseClass,
 			statusFilter === filter
 				? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
 				: 'bg-white text-zinc-600',
-		].join(' ')
+		)
 
 	if (!isAuthReady) {
 		return null
