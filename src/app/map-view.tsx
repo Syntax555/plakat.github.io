@@ -51,6 +51,42 @@ type NominatimResponseItem = {
 	lon: string
 }
 
+type StatusFilter = 'all' | 'hanging' | 'expired'
+
+type OverallPinCounts = {
+	total: number
+	hanging: number
+	expired: number
+}
+
+type StatusFilterOption = {
+	value: StatusFilter
+	label: string
+	ariaLabel: string
+	countKey: keyof OverallPinCounts
+}
+
+const STATUS_FILTERS: StatusFilterOption[] = [
+	{
+		value: 'all',
+		label: 'Alle',
+		ariaLabel: 'Alle Pins anzeigen',
+		countKey: 'total',
+	},
+	{
+		value: 'hanging',
+		label: 'Aktiv',
+		ariaLabel: 'Nur aktive Pins anzeigen',
+		countKey: 'hanging',
+	},
+	{
+		value: 'expired',
+		label: 'Überfällig',
+		ariaLabel: 'Nur überfällige Pins anzeigen',
+		countKey: 'expired',
+	},
+]
+
 const NOMINATIM_BASE_URL =
 	process.env.NEXT_PUBLIC_NOMINATIM_URL ?? 'https://nominatim.openstreetmap.org'
 const NOMINATIM_EMAIL = process.env.NEXT_PUBLIC_NOMINATIM_EMAIL ?? ''
@@ -939,9 +975,7 @@ export function MapView() {
 	const [isSubmitting, setIsSubmitting] = useState(false)
 	const [deletingId, setDeletingId] = useState<string | null>(null)
 	const [isInfoOpen, setIsInfoOpen] = useState(true)
-	const [statusFilter, setStatusFilter] = useState<'all' | 'hanging' | 'expired'>(
-		'all',
-	)
+	const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
 	const [searchQuery, setSearchQuery] = useState('')
 	const [searchResults, setSearchResults] = useState<SearchResult[]>([])
 	const [isSearching, setIsSearching] = useState(false)
@@ -1230,14 +1264,11 @@ const supabaseClient = supabase
 		}
 	}, [hasMorePins, isLoading, isLoadingMore, loadMorePins, pins.length])
 
-	const handleStatusFilterChange = useCallback(
-		(nextFilter: 'all' | 'hanging' | 'expired') => {
+	const handleStatusFilterChange = useCallback((nextFilter: StatusFilter) => {
 			setStatusFilter(previous =>
 				previous === nextFilter ? previous : nextFilter,
 			)
-		},
-		[],
-	)
+		}, [])
 
 	const handleSearchQueryChange = useCallback(
 		(event: ChangeEvent<HTMLInputElement>) => {
@@ -1535,7 +1566,7 @@ const supabaseClient = supabase
 
 	const overallPinCounts = useMemo(
 		() =>
-			pins.reduce(
+			pins.reduce<OverallPinCounts>(
 				(accumulator, pin) => {
 					accumulator.total += 1
 					if (isPinExpired(pin.expiresAt)) {
@@ -1603,7 +1634,7 @@ const supabaseClient = supabase
 		[deletingId, handleDelete, visiblePins],
 	)
 
-	const getFilterButtonClass = (filter: 'all' | 'hanging' | 'expired') =>
+	const getFilterButtonClass = (filter: StatusFilter) =>
 		[
 			filterButtonBaseClass,
 			statusFilter === filter
@@ -1720,39 +1751,21 @@ const supabaseClient = supabase
 								Pins filtern
 							</p>
 							<div className={filterControlsClass}>
-								<button
-									type='button'
-									onClick={() => handleStatusFilterChange('all')}
-									className={getFilterButtonClass('all')}
-									aria-pressed={statusFilter === 'all'}
-								>
-									<span>Alle</span>
-									<span className={legendCountBadgeClass}>
-										{overallPinCounts.total}
-									</span>
-								</button>
-								<button
-									type='button'
-									onClick={() => handleStatusFilterChange('hanging')}
-									className={getFilterButtonClass('hanging')}
-									aria-pressed={statusFilter === 'hanging'}
-								>
-									<span>Aktiv</span>
-									<span className={legendCountBadgeClass}>
-										{overallPinCounts.hanging}
-									</span>
-								</button>
-								<button
-									type='button'
-									onClick={() => handleStatusFilterChange('expired')}
-									className={getFilterButtonClass('expired')}
-									aria-pressed={statusFilter === 'expired'}
-								>
-									<span>Überfällig</span>
-									<span className={legendCountBadgeClass}>
-										{overallPinCounts.expired}
-									</span>
-								</button>
+								{STATUS_FILTERS.map(filter => (
+									<button
+										key={filter.value}
+										type='button'
+										onClick={() => handleStatusFilterChange(filter.value)}
+										className={getFilterButtonClass(filter.value)}
+										aria-pressed={statusFilter === filter.value}
+										aria-label={filter.ariaLabel}
+									>
+										<span>{filter.label}</span>
+										<span className={legendCountBadgeClass}>
+											{overallPinCounts[filter.countKey]}
+										</span>
+									</button>
+								))}
 							</div>
 						</div>
 					) : null}
